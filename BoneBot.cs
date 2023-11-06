@@ -39,7 +39,7 @@ internal partial class BoneBot
         DiscordConfiguration cfg = new()
         {
             Token = token,
-            Intents = DiscordIntents.GuildMessages | DiscordIntents.GuildMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers,
+            Intents = DiscordIntents.GuildMessages | DiscordIntents.MessageContents | DiscordIntents.GuildMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers,
         };
         client = new(cfg);
 
