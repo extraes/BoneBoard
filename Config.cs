@@ -34,10 +34,13 @@ internal class Config
     public ulong frogRole = 0;
     public string frogMessageLink = "";
     public string frogMessageBase = "";
+    public string frogMessageClosedBase = "";
     public string frogLeaderboardLink = "";
     public string frogLeaderboardBase = "";
     [TomlInlineComment("Options: NONE, REACTION, REPLY")]
     public FrogRoleActivation frogRoleActivation = FrogRoleActivation.REPLY;
+    public FrogRoleLimitation frogRoleLimitations = FrogRoleLimitation.DAY_OF_WEEK;
+    public DayOfWeek frogRoleAvailableOn = DayOfWeek.Wednesday;
     public int leaderboardUpdatePeriodMin = 5;
 
     static Config()

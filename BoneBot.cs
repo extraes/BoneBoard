@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using DSharpPlus.Exceptions;
 using DSharpPlus.SlashCommands;
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,6 @@ internal partial class BoneBot
     DiscordMessage? frogMsg;
     DiscordMessage? frogLeaderboardMsg;
     DiscordMember? frogKing;
-    DateTime lastSwitchTime = DateTime.Now;
     volatile bool assigningNewKing;
 
     // activity agnostic
@@ -46,7 +46,7 @@ internal partial class BoneBot
         var slashExtension = client.UseSlashCommands();
         slashExtension.RegisterCommands<ContextActions>();
         slashExtension.RegisterCommands<SlashCommands>();
-
+        
         client.GuildDownloadCompleted += GetGuildResources;
         client.SessionCreated += Ready;
         client.MessageReactionAdded += ReactionAdded;
@@ -122,6 +122,9 @@ internal partial class BoneBot
 
     private async Task MessageCreated(DiscordClient client, MessageCreateEventArgs args)
     {
+        if (Config.values.blockedUsers.Contains(args.Message.Author.Id))
+            return;
+
         if (Config.values.frogRoleActivation == FrogRoleActivation.REPLY)
             await FrogRoleMessageCreated(client, args);
     }
@@ -146,6 +149,10 @@ internal partial class BoneBot
     async Task ReactionAdded(DiscordClient client, MessageReactionAddEventArgs args)
     {
         //todo: add caching member roles/count
+        
+        if (Config.values.blockedUsers.Contains(args.User.Id))
+            return;
+
         if (Config.values.frogRoleActivation == FrogRoleActivation.REACTION)
             await FrogRoleReactionAdded(client, args);
 
@@ -243,6 +250,25 @@ internal partial class BoneBot
 
     private async Task AssignNewFrogKing(DiscordClient client, DiscordGuild guild, DiscordUser newKing)
     {
+        if (Config.values.frogRoleLimitations.HasFlag(FrogRoleLimitation.DAY_OF_WEEK) && DateTime.Now.DayOfWeek != Config.values.frogRoleAvailableOn)
+        {
+            Logger.Put($"Ignoring frog role switch attempt - wrong day ({DateTime.Now.DayOfWeek} doesn't match configured {Config.values.frogRoleAvailableOn})", LogType.Debug);
+
+            string str;
+            if (frogKing is not null)
+                str = string.Format(Config.values.frogMessageClosedBase, frogKing.DisplayName, Config.values.frogRoleAvailableOn);
+            else 
+                str = string.Format(Config.values.frogMessageClosedBase, "somebody/nobody (lol)", Config.values.frogRoleAvailableOn);
+            
+            if (frogMsg is not null && frogMsg.Content != str)
+            {
+                await frogMsg.ModifyAsync(str);
+                frogMsg = await frogMsg.Channel.GetMessageAsync(frogMsg.Id, true);
+            }
+
+            return;
+        }
+
         if (frogKing is not null && frogKing.Id == newKing.Id)
         {
             Logger.Put("The current frog king " + frogKing +" re-reacted to the frog message... lol?", LogType.Debug);
@@ -269,11 +295,16 @@ internal partial class BoneBot
             if (!frogKing?.Roles.Any(r => r.Id == Config.values.frogRole) ?? false)
             {
                 Logger.Put("Updating frogking in cache - D#+ didn't give (our clientside copy of) them the role!", LogType.Debug);
-                frogKing = await guild.GetMemberAsync(frogKing!.Id, true);
+                try
+                {
+                    frogKing = await guild.GetMemberAsync(frogKing!.Id, true);
+                }
+                catch(NotFoundException)
+                {
+                    Logger.Put("Well that's because they're not here anymore... what a bitch. Clearing frogking.");
+                    frogKing = null;
+                }
             }
-
-            // I'm trying to find a more efficient way of finding all users with a role than fetching every member all at once, and it looks like RequestMembersAsync's `query` parameter may be what I need, but I can't seem to find any documentation as to how I would create/format such a string. Are there any resources/examples on how to make such a string?
-            // Fetching all members with a role/using RequestMembersAsync query string
 
             //guild.RequestMembersAsync
 
@@ -295,11 +326,19 @@ internal partial class BoneBot
             Logger.Put("New frog king: " + newFrogKing);
             await newFrogKing.GrantRoleAsync(frogRole, "New king!");
 
+            // frog king may not yet be assigned
+            if (frogKing is not null)
+            {
+                if (PersistentData.values.frogRoleTimes.TryGetValue(frogKing.Id, out TimeSpan ts))
+                    ts += DateTime.Now - PersistentData.values.lastSwitchTime;
+                else ts = DateTime.Now - PersistentData.values.lastSwitchTime;
+                PersistentData.values.frogRoleTimes[frogKing.Id] = ts;
+            }
+
+            PersistentData.values.lastSwitchTime = DateTime.Now;
+
             frogKing = newFrogKing;
 
-            PersistentData.values.frogRoleTimes.TryGetValue(frogKing.Id, out TimeSpan ts);
-            ts += DateTime.Now - lastSwitchTime;
-            PersistentData.values.frogRoleTimes[frogKing.Id] = ts;
 
             // id need to implement a queue system, which adds a lotta comlpexity lel
             // (DateTime.Now - (frogMsg.EditedTimestamp ?? frogMsg.Timestamp)).TotalSeconds > Config.values.editTimeoutSec
@@ -326,23 +365,52 @@ internal partial class BoneBot
             int baseLen = Config.values.frogLeaderboardBase.Length;
             StringBuilder sb = new();
             sb.AppendLine();
-            
+
+            List<ulong> leftUsers = new(2);
+
             foreach (var kvp in PersistentData.values.frogRoleTimes.OrderByDescending(kvp => kvp.Value))
             {
-                DiscordMember memberson = await frogMsg.Channel.Guild.GetMemberAsync(kvp.Key, false);
+                DiscordMember? memberson = null;
+                try
+                {
+                    memberson = await frogMsg.Channel.Guild.GetMemberAsync(kvp.Key, false);
+                }
+                catch(NotFoundException notFoundEx)
+                {
+                    leftUsers.Add(kvp.Key);
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Exception while trying to fetch user (ID {kvp.Key}) for leaderboard: " + ex);
+                    continue;
+                }
+
                 TimeSpan span = kvp.Value;
-                string newLine = $"**{memberson.DisplayName}** - {(span.TotalDays / 7 == 0 ? "" : (span.TotalDays / 7) + "wk, ")}{(span.TotalDays == 0 ? "" : (span.TotalDays % 7) + "d, ")}{span.Hours}H {span.Minutes}m{span.Seconds}s";
+                if (frogKing is not null && memberson == frogKing)
+                    span += DateTime.Now - PersistentData.values.lastSwitchTime;
+
+                int days = (int)span.TotalDays % 7;
+                int weeks = (int)span.TotalDays / 7;
+                string disName = memberson.DisplayName.Contains("mod.io") ? "fordkiller's apprentice" : memberson.DisplayName;
+                string newLine = $"**{disName}** - {(weeks == 0 ? "" : (weeks) + "wk, ")}{(days == 0 ? "" : (days) + "d, ")}{span.Hours}h {span.Minutes}m{span.Seconds}s";
 
                 if (sb.Length + baseLen + newLine.Length + 1 < 2000)
                     sb.AppendLine(newLine);
-                else break;
+                else
+                {
+                    Logger.Put($"Cutting leaderboard short, {newLine.Length}-long line for {memberson.DisplayName} ({memberson.Username}) would have sent the message over 2000 chars to {sb.Length + baseLen + newLine.Length + 1} chars", LogType.Debug);
+                    break;
+                }
             }
 
-            sb.AppendLine();
+            //sb.AppendLine();
 
             string leaderboardTxt = string.Format(Config.values.frogLeaderboardBase, sb.ToString());
             
             Logger.Put($"Updating leaderboard message to a {leaderboardTxt.Length}-long string", LogType.Debug);
+            if (leftUsers.Count > 0)
+                Logger.Put($"Omitted {leftUsers.Count} user(s) from the leaderboard because they left/weren't found: {string.Join(", ", leftUsers)}");
 
             await frogLeaderboardMsg.ModifyAsync(leaderboardTxt);
             PersistentData.WritePersistentData();
@@ -462,7 +530,7 @@ internal partial class BoneBot
         ulong? frogMsgChannel = null;
         ulong? frogMsgId = null;
 
-        string[] idStrings = Config.values.frogMessageLink.Split("/channels/");
+        string[] idStrings = Config.values.frogLeaderboardLink.Split("/channels/");
         ulong[] ids = idStrings[1].Split('/').Skip(1).Select(ulong.Parse).ToArray();
         if (ids.Length >= 2)
         {

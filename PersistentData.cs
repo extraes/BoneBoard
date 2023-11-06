@@ -18,6 +18,7 @@ internal class PersistentData
     private const string PD_PATH = "./persistentData.json";
 
     public Dictionary<ulong, TimeSpan> frogRoleTimes = new();
+    public DateTime lastSwitchTime = DateTime.Now;
 
     static PersistentData()
     {
