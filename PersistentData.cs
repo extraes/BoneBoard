@@ -15,8 +15,7 @@ internal class PersistentData
 {
     public static event Action? PersistentDataChanged;
     public static PersistentData values;
-    private const string PD_PATH = "./persistentData.toml";
-    public string logPath = "./logs/";
+    private const string PD_PATH = "./persistentData.json";
 
     public Dictionary<ulong, TimeSpan> frogRoleTimes = new();
 
@@ -25,7 +24,7 @@ internal class PersistentData
         Console.WriteLine("Initializing persistent data storage");
         if (!File.Exists(PD_PATH))
         {
-            File.WriteAllText(PD_PATH, TomletMain.TomlStringFrom(new PersistentData())); // mmm triple parenthesis, v nice
+            File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(new PersistentData())); // mmm triple parenthesis, v nice
         }
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => WritePersistentData();
@@ -34,7 +33,7 @@ internal class PersistentData
         WritePersistentData();
     }
 
-    public static void OutputRawTOML()
+    public static void OutputRawJSON()
     {
         Console.WriteLine(File.ReadAllText(PD_PATH));
     }
@@ -43,12 +42,15 @@ internal class PersistentData
     public static void ReadPersistentData()
     {
         string configText = File.ReadAllText(PD_PATH);
-        values = TomletMain.To<PersistentData>(configText);
+        values = JsonConvert.DeserializeObject<PersistentData>(configText) ?? new PersistentData();
+        Logger.Put($"Read {values.frogRoleTimes.Count} frog role times from disk.", LogType.Debug);
+
     }
 
     public static void WritePersistentData()
     {
-        File.WriteAllText(PD_PATH, TomletMain.TomlStringFrom(values));
+        Logger.Put($"Writing {values.frogRoleTimes.Count} frog role times to disk.", LogType.Debug);
+        File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(values));
         PersistentDataChanged?.Invoke();
     }
 }
