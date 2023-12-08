@@ -64,7 +64,7 @@ internal partial class BoneBot
         }
         catch(Exception ex)
         {
-            Logger.Error("Exception in periodic-runner!");
+            Logger.Error("Exception in periodic-runner! " + ex);
         }
     }
 
