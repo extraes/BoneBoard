@@ -17,8 +17,17 @@ internal class PersistentData
     public static PersistentData values;
     private const string PD_PATH = "./persistentData.json";
 
-    public Dictionary<ulong, TimeSpan> frogRoleTimes = new();
+    public Dictionary<ulong, TimeSpan> frogRoleTimes = new(); // user id -> time
     public DateTime lastSwitchTime = DateTime.Now;
+    public List<ulong> bufferedChannels = new(); // channel id
+    public Dictionary<ulong, ulong> bufferChannelMessages = new(); // channel id -> message id
+    public Dictionary<ulong, string> bufferChannelMessageFormats = new(); // channel id -> message format string
+    
+    public string currHangmanWord = "";
+    public string currHangmanGuessed = "";
+    public int currHangmanState = 0;
+
+    public Dictionary<ulong, int> casinoPoints = new(); // user id -> points
 
     static PersistentData()
     {

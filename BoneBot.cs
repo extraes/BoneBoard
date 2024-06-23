@@ -1,10 +1,17 @@
 ﻿using DSharpPlus;
+using DSharpPlus.Commands;
+using DSharpPlus.Commands.Processors.MessageCommands;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Processors.TextCommands;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Exceptions;
-using DSharpPlus.SlashCommands;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -16,10 +23,38 @@ namespace BoneBoard;
 
 internal partial class BoneBot
 {
+    const long DEFAULT_FILE_SIZE_LIMIT = 25 * 1000 * 1000; // 25MB
+
     public static Dictionary<DiscordClient, BoneBot> Bots { get; } = new();
 
-    DiscordClient client;
+    internal Casino casino;
+    internal Hangman hangman;
+    internal DiscordClientBuilder clientBuilder;
+    internal DiscordClient client;
     DiscordUser User => client.CurrentUser;
+
+    internal Dictionary<DiscordGuild, HashSet<DiscordChannel>> allChannels = new();
+    //sanitizing
+    static readonly Regex mdCleaningRegex = MarkdownCleaningRegex();
+
+    //message buffer
+    Timer? dumpMessagesTimer;
+    Dictionary<DiscordChannel, Queue<DiscordMessage>> queuedMessages = new();
+    Dictionary<string, DiscordMessage> recreatedContentToReferences = new();
+    Dictionary<string, string> cachedQueuedAttachmentPaths = new();
+    HttpClient attachmentDownloadClient = new();
+
+    readonly Dictionary<DiscordPremiumTier, long> FileSizeLimits = new()
+    {
+        { DiscordPremiumTier.None, DEFAULT_FILE_SIZE_LIMIT },
+        { DiscordPremiumTier.Tier_1, DEFAULT_FILE_SIZE_LIMIT },
+        { DiscordPremiumTier.Tier_2, 50 * 1000 * 1000 },
+        { DiscordPremiumTier.Tier_3, 100 * 1000 * 1000 },
+    };
+
+    // cool confessional
+    DiscordChannel? confessionalChannel;
+    Dictionary<DiscordMember, DateTime> confessions = new();
 
     // boneboard
     DiscordChannel? quoteOutputChannel;
@@ -34,57 +69,129 @@ internal partial class BoneBot
     // activity agnostic
     DiscordChannel? logChannel;
 
+    private bool calledAllChannelsRecieved;
+    private Action<Dictionary<DiscordGuild, HashSet<DiscordChannel>>>? allChannelsRecieved;
+    internal event Action<Dictionary<DiscordGuild, HashSet<DiscordChannel>>> AllChannelsRecieved
+    {
+        add
+        {
+            if (calledAllChannelsRecieved)
+                value(allChannels);
+            allChannelsRecieved += value;
+        }
+        remove { allChannelsRecieved -= value; }
+    }
+
+    public static async void TryRestoreConnections()
+    {
+        foreach (var client in Bots.Keys)
+        {
+            try
+            {
+                await client.ReconnectAsync(false);
+                Logger.Put("Reconnected on " + client.CurrentUser);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Exception while trying to restore connection! " + ex);
+            }
+        }
+    }
+
     public BoneBot(string token)
     {
-        DiscordConfiguration cfg = new()
-        {
-            Token = token,
-            Intents = DiscordIntents.GuildMessages | DiscordIntents.MessageContents | DiscordIntents.GuildMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers,
-        };
-        client = new(cfg);
+        //Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.addconsole)
+        clientBuilder = DiscordClientBuilder.CreateDefault(token, DiscordIntents.GuildMessages | DiscordIntents.MessageContents | DiscordIntents.GuildMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers);
+        clientBuilder.SetLogLevel(LogLevel.Trace);
+        clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
+        clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Trace)));
+        clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(BoneBot), this));
+        casino = new(this);
+        hangman = new(this);
 
-        var slashExtension = client.UseSlashCommands();
-        slashExtension.RegisterCommands<ContextActions>();
-        slashExtension.RegisterCommands<SlashCommands>();
+        //commandsExtension.AddProcessorAsync()
+
+        clientBuilder.ConfigureEventHandlers(e =>
+        {
+            e.HandleGuildDownloadCompleted(GetGuildResources)
+                .HandleSessionCreated(Ready)
+                .HandleMessageReactionAdded(ReactionAdded)
+                .HandleMessageCreated(MessageCreated)
+                .HandleMessageUpdated(MessageUpdated);
+        });
+        client = clientBuilder.Build();
         
-        client.GuildDownloadCompleted += GetGuildResources;
-        client.SessionCreated += Ready;
-        client.MessageReactionAdded += ReactionAdded;
-        client.MessageCreated += MessageCreated;
         Bots.Add(client, this);
+    }
+
+    public void ConfigureEvents(Action<EventHandlingBuilder> action)
+    {
+        if (client is not null)
+            return;
+            //throw new InvalidOperationException("Cannot add events after client is built!");
+
+        clientBuilder.ConfigureEventHandlers(action);
     }
 
     public async void Init()
     {
+        //todo re-add commands
+        var commandsExtension = client.UseCommands(new()
+        {
+            //ServiceProvider = sc.BuildServiceProvider(),
+            RegisterDefaultCommandProcessors = false
+        });
+
+        SlashCommandProcessor scp = new();
+        MessageCommandProcessor mcp = new();
+        await commandsExtension.AddProcessorsAsync(scp, mcp);
+        commandsExtension.AddCommands([typeof(SlashCommands), typeof(MessageContextActions), typeof(Casino), typeof(Hangman)]);
+
+
         await client.ConnectAsync();
 
         try
         {
             UpdateLeaderboard();
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Logger.Error("Exception in periodic-runner! " + ex);
         }
     }
 
-    Task GetGuildResources(DiscordClient client, GuildDownloadCompletedEventArgs args)
+    private async Task GetGuildResources(DiscordClient client, GuildDownloadCompletedEventArgs args)
     {
         foreach (var channelKvp in args.Guilds.Values.SelectMany(dg => dg.Channels))
         {
+            if (!allChannels.TryGetValue(channelKvp.Value.Guild, out var allChannelsSlice))
+                allChannelsSlice = allChannels[channelKvp.Value.Guild] = new();
+
+            allChannelsSlice.Add(channelKvp.Value);
+            if (channelKvp.Value.Type == DiscordChannelType.Text)
+            {
+                foreach (DiscordThreadChannel thread in channelKvp.Value.Threads)
+                {
+                    allChannelsSlice.Add(thread);
+                }
+            }
 
             if (channelKvp.Key == Config.values.outputChannel)
                 quoteOutputChannel = channelKvp.Value;
+            else if (channelKvp.Key == Config.values.confessionalChannel)
+                confessionalChannel = channelKvp.Value;
             else if (channelKvp.Key == Config.values.logChannel)
                 logChannel = channelKvp.Value;
             else
             {
-                if (channelKvp.Value.Type != ChannelType.Text) continue;
+                if (channelKvp.Value.Type != DiscordChannelType.Text) continue;
 
                 foreach (DiscordThreadChannel thread in channelKvp.Value.Threads)
                 {
                     if (thread.Id == Config.values.outputChannel)
                         quoteOutputChannel = thread;
+                    else if (thread.Id == Config.values.confessionalChannel)
+                        confessionalChannel = thread;
                     else if (thread.Id == Config.values.logChannel)
                         logChannel = thread;
                 }
@@ -102,10 +209,13 @@ internal partial class BoneBot
         _ = FetchFrogMessage();
         _ = FetchFrogLeaderboardMsg();
 
-        return Task.CompletedTask;
+        allChannelsRecieved?.InvokeActionSafe(allChannels);
+        calledAllChannelsRecieved = true;
+
+        await hangman.Init();
     }
 
-    Task Ready(DiscordClient client, SessionReadyEventArgs args)
+    async Task Ready(DiscordClient client, SessionCreatedEventArgs args)
     {
         try
         {
@@ -115,21 +225,74 @@ internal partial class BoneBot
         {
             Logger.Put("Discord session created!");
         }
-        return Task.CompletedTask;
     }
 
     #region Message
 
-    private async Task MessageCreated(DiscordClient client, MessageCreateEventArgs args)
+    private async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
     {
-        if (Config.values.blockedUsers.Contains(args.Message.Author.Id))
+        if (args.Message.Author is null || Config.values.blockedUsers.Contains(args.Message.Author.Id))
             return;
+        DiscordMember? member = args.Author as DiscordMember;
+        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermissions.ManageMessages);
+
+        if (!hasManageMessages && Config.values.channelsWhereNoVowelsAreAllowed.Contains(args.Channel.Id) && args.Message.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase)))
+        {
+            bool isValidGuess = args.Message.Content.Length == 1 && char.IsLetter(args.Message.Content[0])
+                             || args.Message.Content.Length == PersistentData.values.currHangmanWord.Length;
+            bool replyingToHangman = args.Message.ReferencedMessage?.JumpLink.OriginalString == Config.values.hangmanMessageLink;
+            if (!replyingToHangman || !isValidGuess)
+            {
+                try
+                {
+                    await args.Message.DeleteAsync("has vowels. cnat do that.,");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Failed to delete message with vowels! ", ex);
+                }
+            }
+        }
+
+        if (Config.values.channelsWhereUsersAreProhibitedFromMedia.TryGetValue(args.Channel.Id.ToString(), out ulong[]? userIds) && userIds.Contains(args.Author.Id))
+        {
+            if (args.Message.Attachments.Count > 0 || args.Message.Embeds.Count > 0)
+            {
+                try
+                {
+                    await args.Message.DeleteAsync("this user gets no media in this channel. woe.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Failed to delete message with media from {member}! ", ex);
+                }
+            }
+        }
 
         if (Config.values.frogRoleActivation == FrogRoleActivation.REPLY)
             await FrogRoleMessageCreated(client, args);
+
+        bool isBufferExempt = member is not null && member.Roles.Any(r => Config.values.bufferExemptRoles.Contains(r.Id));
+        if (PersistentData.values.bufferedChannels.Contains(args.Channel.Id) && !isBufferExempt && !IsMe(args.Author))
+            await BufferMessage(args.Message);
     }
 
-    private async Task FrogRoleMessageCreated(DiscordClient client, MessageCreateEventArgs args)
+    private async Task MessageUpdated(DiscordClient sender, MessageUpdatedEventArgs args)
+    {
+        if (args.Author?.IsBot ?? true)
+            return;
+        DiscordMember? member = args.Author as DiscordMember;
+        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermissions.ManageMessages);
+
+        if (!hasManageMessages && Config.values.channelsWhereNoVowelsAreAllowed.Contains(args.Channel.Id) && args.Message.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase)))
+        {
+            await args.Message.DeleteAsync("has vowels. cnat edit to do that., u tried'");
+        }
+    }
+
+    private async Task FrogRoleMessageCreated(DiscordClient client, MessageCreatedEventArgs args)
     {
         if (frogMsg is null && !string.IsNullOrEmpty(Config.values.frogMessageLink))
         {
@@ -137,8 +300,10 @@ internal partial class BoneBot
             return;
         }
 
-        if (frogMsg is null || args.Message.ReferencedMessage != frogMsg)
+        if (frogMsg is null || args.Message.ReferencedMessage is null || args.Message.ReferencedMessage != frogMsg || args.Message.Author is null)
             return;
+
+
 
         await AssignNewFrogKing(client, args.Guild, args.Message.Author);
     }
@@ -146,10 +311,10 @@ internal partial class BoneBot
     #endregion
 
     #region Reaction
-    async Task ReactionAdded(DiscordClient client, MessageReactionAddEventArgs args)
+    async Task ReactionAdded(DiscordClient client, MessageReactionAddedEventArgs args)
     {
         //todo: add caching member roles/count
-        
+
         if (Config.values.blockedUsers.Contains(args.User.Id))
             return;
 
@@ -160,7 +325,7 @@ internal partial class BoneBot
     }
 
 
-    private async Task FrogRoleReactionAdded(DiscordClient client, MessageReactionAddEventArgs args)
+    private async Task FrogRoleReactionAdded(DiscordClient client, MessageReactionAddedEventArgs args)
     {
         if (frogMsg is null && !string.IsNullOrEmpty(Config.values.frogMessageLink))
         {
@@ -203,7 +368,7 @@ internal partial class BoneBot
     }
 
 
-    private async Task BoneBoardReactionAdded(DiscordClient client, MessageReactionAddEventArgs args)
+    private async Task BoneBoardReactionAdded(DiscordClient client, MessageReactionAddedEventArgs args)
     {
 
         if (!Config.values.requiredEmojis.Contains(args.Emoji.Id)) return;
@@ -257,9 +422,9 @@ internal partial class BoneBot
             string str;
             if (frogKing is not null)
                 str = string.Format(Config.values.frogMessageClosedBase, frogKing.DisplayName, Config.values.frogRoleAvailableOn);
-            else 
+            else
                 str = string.Format(Config.values.frogMessageClosedBase, "somebody/nobody (lol)", Config.values.frogRoleAvailableOn);
-            
+
             if (frogMsg is not null && frogMsg.Content != str)
             {
                 await frogMsg.ModifyAsync(str);
@@ -271,7 +436,7 @@ internal partial class BoneBot
 
         if (frogKing is not null && frogKing.Id == newKing.Id)
         {
-            Logger.Put("The current frog king " + frogKing +" re-reacted to the frog message... lol?", LogType.Debug);
+            Logger.Put("The current frog king " + frogKing + " re-reacted to the frog message... lol?", LogType.Debug);
             return;
         }
 
@@ -299,7 +464,7 @@ internal partial class BoneBot
                 {
                     frogKing = await guild.GetMemberAsync(frogKing!.Id, true);
                 }
-                catch(NotFoundException)
+                catch (NotFoundException)
                 {
                     Logger.Put("Well that's because they're not here anymore... what a bitch. Clearing frogking.");
                     frogKing = null;
@@ -312,7 +477,7 @@ internal partial class BoneBot
             {
                 Logger.Warn($"Fetching all members of {guild.Name} because {(frogKing is null ? "there's no saved frog king" : $"the frog king '{frogKing.DisplayName}' didn't have the frog role")}");
 
-                foreach (DiscordMember memberson in await guild.GetAllMembersAsync())
+                await foreach (DiscordMember memberson in guild.GetAllMembersAsync())
                 {
                     if (!memberson.Roles.Any(r => r.Id == Config.values.frogRole))
                         continue;
@@ -373,9 +538,9 @@ internal partial class BoneBot
                 DiscordMember? memberson = null;
                 try
                 {
-                    memberson = await frogMsg.Channel.Guild.GetMemberAsync(kvp.Key, false);
+                    memberson = await frogMsg.Channel!.Guild.GetMemberAsync(kvp.Key, false);
                 }
-                catch(NotFoundException notFoundEx)
+                catch (NotFoundException)
                 {
                     leftUsers.Add(kvp.Key);
                     continue;
@@ -407,7 +572,7 @@ internal partial class BoneBot
             //sb.AppendLine();
 
             string leaderboardTxt = string.Format(Config.values.frogLeaderboardBase, sb.ToString());
-            
+
             Logger.Put($"Updating leaderboard message to a {leaderboardTxt.Length}-long string", LogType.Debug);
             if (leftUsers.Count > 0)
                 Logger.Put($"Omitted {leftUsers.Count} user(s) from the leaderboard because they left/weren't found: {string.Join(", ", leftUsers)}");
@@ -434,7 +599,7 @@ internal partial class BoneBot
 
     public async Task PerformQuote(DiscordMessage msg, DiscordEmoji? triggeredEmoji)
     {
-        if (msg.Author is null)
+        if (msg.Author is null && msg.Channel is not null)
             msg = await msg.Channel.GetMessageAsync(msg.Id);
 
         if (quoteOutputChannel is null)
@@ -450,18 +615,23 @@ internal partial class BoneBot
         try
         {
             if (triggeredEmoji is not null)
-            await msg.CreateReactionAsync(triggeredEmoji);
+                await msg.CreateReactionAsync(triggeredEmoji);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Logger.Warn($"Bot is blocked by {msg.Author}, cannot react so will not continue. Full exception: " + ex);
             if (logChannel is not null)
-                await logChannel.SendMessageAsync($"Bot is blocked by {msg.Author} or otherwise cannot react, so will not continue quoting {msg.JumpLink}");
+                await logChannel.SendMessageAsync($"Bot is (probably?) blocked by {msg.Author} or otherwise cannot react, so will not continue quoting {msg.JumpLink}");
         }
 
+        string displayName = msg.Author is DiscordMember member ? member.DisplayName : msg.Author?.GlobalName ?? msg.Author?.Username ?? "A user";
+        using Image? quote = await Quoter.GenerateImageFrom(msg, client);
+        if (quote is null)
+        {
+            Logger.Warn("Failed to generate quote image for message " + msg.JumpLink);
+            return;
+        }
 
-        string displayName = msg.Author is DiscordMember member ? member.DisplayName : msg.Author.GlobalName ?? msg.Author.Username;
-        using Image quote = await Quoter.GenerateImageFrom(msg, client);
         using MemoryStream ms = new();
 
         await quote.SaveAsPngAsync(ms);
@@ -477,7 +647,7 @@ internal partial class BoneBot
         }
         catch (Exception ex)
         {
-            Logger.Error("Exception while trying to send message (or react) for quote process's final step!", ex);
+            Logger.Error("Exception while trying to send message for quote process's final step!", ex);
         }
     }
 
@@ -508,7 +678,7 @@ internal partial class BoneBot
                 return;
             }
 
-            foreach (var thread in guild.Channels.SelectMany(chp => chp.Value.Type == ChannelType.Text ? chp.Value.Threads : Enumerable.Empty<DiscordThreadChannel>()))
+            foreach (var thread in guild.Channels.SelectMany(chp => chp.Value.Type == DiscordChannelType.Text ? chp.Value.Threads : Enumerable.Empty<DiscordThreadChannel>()))
             {
                 if (thread.Id == frogMsgChannel.Value)
                 {
@@ -549,7 +719,7 @@ internal partial class BoneBot
                 return;
             }
 
-            foreach (var thread in guild.Channels.SelectMany(chp => chp.Value.Type == ChannelType.Text ? chp.Value.Threads : Enumerable.Empty<DiscordThreadChannel>()))
+            foreach (var thread in guild.Channels.SelectMany(chp => chp.Value.Type == DiscordChannelType.Text ? chp.Value.Threads : Enumerable.Empty<DiscordThreadChannel>()))
             {
                 if (thread.Id == frogMsgChannel.Value)
                 {
@@ -561,4 +731,287 @@ internal partial class BoneBot
 
         Logger.Error("Failed to fetch message link @ " + Config.values.frogMessageLink);
     }
+
+    public async Task<DiscordMessage?> SendConfessional(DiscordMember member, string text)
+    {
+        if (confessionalChannel is null)
+            return null;
+
+        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.ROLE))
+        {
+            if (member.Roles.All(r => r.Id != Config.values.confessionalRole))
+                return null;
+        }
+
+        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
+        {
+            if (confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+                return null;
+            confessions[member] = DateTime.Now;
+        }
+
+        Logger.Put($"Going to send a msg in the confessional channel #{confessionalChannel.Name} - {text}");
+
+        var deb = new DiscordEmbedBuilder()
+            .WithTitle($"A {member.Guild.Name} confession...")
+            .WithDescription(text);
+
+        var dmb = new DiscordMessageBuilder()
+            .WithAllowedMentions(Enumerable.Empty<IMention>())
+            .AddEmbed(deb);
+
+        string authorString = $"{member.Username} - id {member.Id}";
+        try
+        {
+            DiscordMessage msg = await confessionalChannel.SendMessageAsync(dmb);
+            Logger.Put($"Confession sent was from the following B64-encoded user: {Convert.ToBase64String(Encoding.UTF8.GetBytes(authorString))}", LogType.Debug);
+            return msg;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Failed to send a confessional by {authorString} - {ex}");
+            return null;
+        }
+    }
+
+    async Task BufferMessage(DiscordMessage msg)
+    {
+        try
+        {
+            if (!FileSizeLimits.TryGetValue(msg.Channel.Guild.PremiumTier, out long fileSizeLimit))
+                fileSizeLimit = DEFAULT_FILE_SIZE_LIMIT;
+
+            foreach (DiscordAttachment attachment in msg.Attachments)
+            {
+                if (attachment.FileSize > fileSizeLimit)
+                {
+                    Logger.Put($"Attachment {attachment.FileName} on message {msg.JumpLink} is too big to buffer! ({Math.Round(attachment.FileSize / 1024.0 / 1024.0, 2)}MB > {Math.Round(fileSizeLimit / 1024.0 / 1024.0, 2)}MB)");
+                    continue;
+                }
+
+                string path = Path.GetTempFileName();
+                using FileStream fs = File.OpenWrite(path);
+                using Stream dlStream = await attachmentDownloadClient.GetStreamAsync(attachment.Url);
+                await dlStream.CopyToAsync(fs);
+
+                cachedQueuedAttachmentPaths[attachment.Url] = path;
+            }
+
+            if (!queuedMessages.TryGetValue(msg.Channel, out Queue<DiscordMessage>? queue))
+            {
+                queue = new();
+                queuedMessages[msg.Channel] = queue;
+            }
+
+            queue.Enqueue(msg);
+
+            await msg.DeleteAsync("Buffering message 😃👍"); // 😃👍
+            Logger.Put($"Buffered message from {msg.Author} in {msg.Channel.Name} - {msg.Content}");
+        }
+        catch(Exception ex)
+        {
+            Logger.Error("Exception while buffering message! " + ex);
+            logChannel?.SendMessageAsync("Exception while buffering message! " + ex);
+        }
+    }
+
+    public void StartUnbufferTimer()
+    {
+        dumpMessagesTimer?.Change(Timeout.Infinite, Timeout.Infinite); // "neuter" the old timer
+
+        TimeSpan waitTime = TimeSpan.FromMinutes(Config.values.bufferTimeMinutes);
+        dumpMessagesTimer = new(_ => _ = SendBufferedMessages(), null, waitTime, waitTime);
+    }
+
+    public async Task SendBufferedMessages()
+    {
+        DateTime nextTime = DateTime.Now.AddMinutes(Config.values.bufferTimeMinutes);
+        List<FileStream> openedFiles = new();
+
+        foreach ((DiscordChannel channel, Queue<DiscordMessage> deletedMessages) in queuedMessages)
+        {
+            try
+            {
+                while (deletedMessages.Count > 0)
+                {
+                    DiscordMessage recreateMessage = deletedMessages.Dequeue();
+                    Logger.Put($"Sending buffered message from {recreateMessage.Author}");
+                    DiscordMessage? reference = recreateMessage.ReferencedMessage;
+
+                    if (reference is not null && recreatedContentToReferences.TryGetValue(recreateMessage.ReferencedMessage.Content, out DiscordMessage? refMsg))
+                        reference = refMsg;
+
+
+                    string author = recreateMessage.Author is DiscordMember member ? mdCleaningRegex.Replace(member.DisplayName, @$"\$1").Replace("://", "\\://") : recreateMessage.Author.Username;
+                    string replyingToAuthor = reference?.Author is DiscordMember replyMember ? mdCleaningRegex.Replace(replyMember.DisplayName, @$"\$1").Replace("https:", "https\\:") : reference?.Author.Username ?? "NOBODY LOL";
+                    string replyingToContent = reference is not null ? Logger.EnsureShorterThan(reference.Content, 200, "(yap)").Replace("\n", "") : "";
+                    string content = Logger.EnsureShorterThan(recreateMessage.Content, 2000 - replyingToAuthor.Length - replyingToContent.Length - author.Length - 50, "(Truncated due to exceessive yapping)");
+
+                    string finalContent = (reference is not null ? $"Replying to **{replyingToAuthor}**: '{replyingToContent}'\n" : "")
+                        + (!string.IsNullOrWhiteSpace(content) ? $"\"{content}\"\n" : "")
+                        + $"\\- {author}";
+
+                    recreatedContentToReferences[finalContent] = recreateMessage;
+
+                    var builder = new DiscordMessageBuilder()
+                        .WithContent(finalContent)
+                        .WithAllowedMentions(Enumerable.Empty<IMention>());
+
+                    foreach (DiscordAttachment attachment in recreateMessage.Attachments)
+                    {
+                        // todo: make uploads go to extraes.xyz when too big (requires skating around cloudflare's 100mb limit on free accts. try/add chunking!)
+                        if (attachment.FileSize > DEFAULT_FILE_SIZE_LIMIT)
+                            continue;
+
+                        if (!cachedQueuedAttachmentPaths.TryGetValue(attachment.Url, out string? path))
+                        {
+                            Logger.Error("An attachment was on a queued message, but it wasn't cached on-disk!");
+                            continue;
+                        }
+
+                        if (!File.Exists(path))
+                        {
+                            Logger.Error("An attachment supposedly queued, but it doesn't exist on-disk!");
+                            continue;
+                        }
+
+                        FileStream fs = File.OpenRead(path);
+                        string fileName = attachment.FileName;
+                        while(builder.Files.Any(f => f.FileName == fileName))
+                        {
+                            
+                            fileName = Random.Shared.Next(10) + "_" + fileName;
+                        }
+                        builder.AddFile(fileName, fs);
+                        openedFiles.Add(fs);
+                    }
+
+                    await channel.SendMessageAsync(builder);
+
+                    await Task.Delay(1000); // rate limit
+
+                    foreach (FileStream fs in openedFiles)
+                    {
+                        fs.Close();
+                        File.Delete(fs.Name); // 👍
+                    }
+                    openedFiles.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Exception sending buffered message! " + ex);
+                logChannel?.SendMessageAsync("Exception sending buffered message! " + ex);
+            }
+
+            try
+            {
+                if (!PersistentData.values.bufferChannelMessages.TryGetValue(channel.Id, out ulong bufferNotifMsgId))
+                {
+                    Logger.Error($"Buffered channel {channel.Name} doesn't have a saved notification message ID!");
+                    continue;
+                }
+                if (!PersistentData.values.bufferChannelMessageFormats.TryGetValue(channel.Id, out string? bufferFormat))
+                {
+                    Logger.Error($"Buffered channel {channel.Name} doesn't have a saved notification message format str!");
+                    continue;
+                }
+
+                DiscordMessage bufferNotifMsg = await channel.GetMessageAsync(bufferNotifMsgId);
+                await bufferNotifMsg.DeleteAsync("outlived its usefulness. FOLD.");
+
+                string content = string.Format(bufferFormat, Formatter.Timestamp(nextTime, TimestampFormat.ShortTime));
+                DiscordMessage msg = await channel.SendMessageAsync(content);
+                PersistentData.values.bufferChannelMessages[channel.Id] = msg.Id;
+                PersistentData.WritePersistentData();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Exception while editing buffer notif msg! " + ex);
+            }
+        }
+
+        TimeSpan waitTime = TimeSpan.FromMinutes(Config.values.bufferTimeMinutes);
+
+        dumpMessagesTimer?.Change(nextTime - DateTime.Now, waitTime);
+    }
+
+    public async Task<DiscordMessage?> GetMessageFromLink(string link)
+    {
+        if (!link.Contains("/channels/"))
+        {
+            Logger.Put("Invalid message link: " + link);
+            return null;
+        }
+
+        ulong? targtChannelId = null;
+        ulong? targetMessageId = null;
+
+        string[] idStrings = link.Split("/channels/");
+        ulong[] ids = idStrings[1].Split('/').Skip(1).Select(ulong.Parse).ToArray();
+        if (ids.Length >= 2)
+        {
+            targtChannelId = ids[0];
+            targetMessageId = ids[1];
+        }
+
+        if (!targetMessageId.HasValue || !targtChannelId.HasValue)
+            return null;
+
+        DiscordChannel? channel;
+
+        if (calledAllChannelsRecieved)
+            channel = allChannels.SelectMany(kvp => kvp.Value).FirstOrDefault(ch => ch.Id == targtChannelId);
+        else
+        {
+            // backup slow path
+            try
+            {
+                // doesnt fucking work with threads AWESOME DUDE
+                channel = await client.GetChannelAsync(targetMessageId.Value);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Caught exception while attempting to fetch channel for jump link " + link, ex);
+                return null;
+            }
+        }
+
+
+        if (channel is null)
+            return null;
+
+        try
+        {
+            DiscordMessage msg = await channel.GetMessageAsync(targetMessageId.Value);
+            return msg;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    internal static async Task<bool> TryReact(DiscordMessage message, params DiscordEmoji[] emojis)
+    {
+        try
+        {
+            foreach (DiscordEmoji emoji in emojis)
+            {
+                await message.CreateReactionAsync(emoji);
+
+                if (emojis.Length != 1) 
+                    await Task.Delay(1000); // discord is *really* tight on reaction ratelimits
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Exception while reacting to message", ex);
+            return false;
+        }
+    }
+
+    [GeneratedRegex(@"(?<!\\)(\[|\]|\*|_|~|`|<|>|#)", RegexOptions.Compiled)]
+    private static partial Regex MarkdownCleaningRegex();
 }

@@ -1,9 +1,12 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using SixLabors.Fonts;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -14,6 +17,14 @@ internal static partial class Quoter
     internal static readonly Regex UserMention = BakedRegex_UserMention();
     [GeneratedRegex(@"<@!?(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
     private static partial Regex BakedRegex_UserMention();
+
+    internal static readonly Regex RoleMention = BakedRegex_RoleMention();
+    [GeneratedRegex(@"<@&(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
+    private static partial Regex BakedRegex_RoleMention();
+
+    internal static readonly Regex ChannelMention = BakedRegex_ChannelMention();
+    [GeneratedRegex(@"<#(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
+    private static partial Regex BakedRegex_ChannelMention();
 
     internal static readonly Regex Link = BakedRegex_Link();
     [GeneratedRegex(@"\w+://\S+", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
@@ -26,8 +37,11 @@ internal static partial class Quoter
     static HttpClient pfpGetter = new();
     static HttpClient mediaGetter = new();
 
-    public static async Task<Image> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)
+    public static async Task<Image?> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)
     {
+        if (msg.Author is null || msg.Channel is null)
+            return null;
+
         bool global = !Config.values.useServerProfile;
         //string extraText; might re-add later?
         string pfpUrl;
@@ -57,8 +71,11 @@ internal static partial class Quoter
             }
         }
 
-        MatchEvaluator matchEval = new(match => ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
-        cleanContent = UserMention.Replace(msg.Content, matchEval);
+        MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
+        cleanContent = UserMention.Replace(msg.Content, userMentionEvaluator);
+
+        MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
+        cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
 
         if (msg.Attachments.Any()) mediaThumb = msg.Attachments[0].Url;
 
@@ -66,15 +83,21 @@ internal static partial class Quoter
         {
             foreach (var embed in msg.Embeds)
             {
-                if (embed.Type == "gifv" || embed.Type == "image" || embed.Type == "video")
-                    mediaThumb = embed?.Thumbnail?.ProxyUrl.ToString();
+                switch (embed.Type)
+                {
+                    case "gifv":
+                    case "image":
+                    case "video":
+                        mediaThumb = embed?.Thumbnail?.ProxyUrl.ToString();
+                        break;
+                }
             }
         }
 
         if (mediaThumb is null)
         {
-            var sticker = msg.Stickers.FirstOrDefault();
-            if (sticker is not null && sticker.FormatType != StickerFormat.LOTTIE)
+            var sticker = msg.Stickers?.FirstOrDefault();
+            if (sticker is not null && sticker.FormatType != DiscordStickerFormat.LOTTIE)
                 mediaThumb = sticker.StickerUrl;
         }
 
@@ -100,10 +123,10 @@ internal static partial class Quoter
         {
             try
             {
-                if (cleanContent.Length >= mediaThumb.Length + 2)
+                cleanContent = Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
+
+                if (cleanContent == "<Link>")
                     cleanContent = "";
-                else
-                    cleanContent = Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
 
                 using Stream mediaStream = await mediaGetter.GetStreamAsync(mediaThumb);
                 media = await Image.LoadAsync(mediaStream);
@@ -120,16 +143,35 @@ internal static partial class Quoter
         if (string.IsNullOrWhiteSpace(cleanContent) && media is null)
             subtext = "So true...";
         else if (msg.ReferencedMessage is not null)
-            subtext = GetReplyString(msg.ReferencedMessage);
+            subtext = GetReplyString(msg.ReferencedMessage, clint, global ? msg.Channel.Guild : null);
         else if (msg.Reference is not null)
-            subtext = GetReplyString(await msg.Channel.GetMessageAsync(msg.Reference.Message.Id));
+            subtext = GetReplyString(await msg.Channel.GetMessageAsync(msg.Reference.Message.Id), clint, global ? msg.Channel.Guild : null);
 
         if (cleanContent == "<Link>")
             cleanContent = "";
 
-        return Quotify(img, name, cleanContent, msg.Timestamp.Year, subtext, media); // extraText parameter currently unused
+        return Quotify(img, name, cleanContent, msg.Timestamp.Year, subtext, media);
     }
 
+    static string CleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
+    {
+        string cleanContent = msg.Content;
+        MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, guild));
+        cleanContent = UserMention.Replace(cleanContent, userMentionEvaluator);
+
+        MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
+        cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
+
+        cleanContent = CustomEmoji.Replace(cleanContent, @":$1:");
+
+
+        cleanContent = Link.Replace(cleanContent, "<Link>");
+
+        if (cleanContent == "<Link>")
+            cleanContent = "";
+
+        return cleanContent;
+    }
 
     static string ReplaceIdWithUser(Match match, DiscordClient clint, DiscordGuild? guild)
     {
@@ -162,6 +204,47 @@ internal static partial class Quoter
         else return $"@{name}";
     }
 
+    static string ReplaceIdWithRole(Match match, DiscordClient clint, DiscordGuild? guild)
+    {
+        if (guild is null)
+            return "@Role";
+
+        ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+        string? name = guild.GetRole(id)?.Name;
+
+        // to date i dont think name has been null, this should be fine
+        if (name is null)
+            return "@Role";
+        else return $"@{name}";
+    }
+
+    static string ReplaceIdWithChannel(Match match, DiscordClient clint, DiscordGuild? guild)
+    {
+        if (guild is null)
+            return "#channel";
+
+        ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+        string? name;
+
+        // not that good to synchronize async like this, but its fine enough cuz its only called from an async method lol
+        try
+        {
+            name = guild.GetChannelAsync(id).GetAwaiter().GetResult()?.Name ?? BoneBot.Bots[clint].allChannels[guild].First(ch => ch.Id == id).Name;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Failed to fetch guild channel from ID {id}. Why?", ex);
+            name = null;
+            //DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
+            //name = user?.GlobalName ?? user?.Username;
+        }
+
+        // to date i dont think name has been null, this should be fine
+        if (name is null)
+            return "#channel";
+        else return $"#{name}";
+    }
+
     public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512)
     {
         name = name.Replace("\n", " ").Trim();
@@ -172,7 +255,7 @@ internal static partial class Quoter
 
 
         Image<Rgba32> quoteBaseplate = new(width, height);
-        var config = quoteBaseplate.GetConfiguration();
+        var config = quoteBaseplate.Configuration;
         GraphicsOptions opt = new();
         quoteBaseplate.Mutate(x => x.BackgroundColor(Color.Black));
 
@@ -201,13 +284,16 @@ internal static partial class Quoter
         FontFamily ffEmoji = SystemFonts.Get("Twemoji Mozilla");
         Font usernameFont = new(ff, NAME_FONT_SIZE);
 
+        bool offsetMediaAndQuote = media is not null && (float)media.Width / media.Height > 2;
+        const float THIN_IMG_OFFSET = 0.25f;
+
         if (media is not null)
         {
             media.Mutate(x => x.EntropyCrop(0.1f)); // may need to try adding extra padding
             float mediaAreaWidth = pfpPt.X;
-            float mediaAreaHeight = height;
+            float mediaAreaHeight = offsetMediaAndQuote ? height * (1 - THIN_IMG_OFFSET) : height;
             float mediaAreaMiddleX = mediaAreaWidth / 2;
-            float mediaAreaMiddleY = mediaAreaHeight / 2;
+            float mediaAreaMiddleY = offsetMediaAndQuote ? (height * THIN_IMG_OFFSET) + (mediaAreaHeight / 2) : height / 2;
 
             if (media.Height + media.Width == 0)
                 throw new InvalidOperationException($"Media image is zero-size! How even? Dimensions: {media.Width} x {media.Height}");
@@ -218,7 +304,7 @@ internal static partial class Quoter
             media.Mutate(x => x.Resize(newSize));
 
             Point mediaTopLeft = new(0, (int)mediaAreaMiddleY - media.Height / 2);
-            Point mediaBottomRight = new Point(media.Width + mediaTopLeft.X, media.Height + mediaTopLeft.Y);
+            Point mediaBottomRight = new(media.Width + mediaTopLeft.X, media.Height + mediaTopLeft.Y);
 
             quoteBaseplate.Mutate(x => x.DrawImage(media, mediaTopLeft, 1));
 
@@ -238,6 +324,13 @@ internal static partial class Quoter
             {
                 lgbt = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaTopLeft.X, mediaTopLeft.Y), GradientRepetitionMode.None, halfBlackStart, transparentEnd);
                 quoteBaseplate.Mutate(x => x.Fill(lgbt, mediaRect));
+
+                if (!string.IsNullOrEmpty(extraText))
+                {
+                    lgbtq = new(new Point(mediaBottomRight.X, mediaBottomRight.Y), new Point(mediaTopLeft.X, mediaTopLeft.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
+                    //lgbtqia = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaTopLeft.X, mediaBottomRight.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
+                    quoteBaseplate.Mutate(x => x.Fill(lgbtq, mediaRect));
+                }
             }
         }
 
@@ -250,9 +343,10 @@ internal static partial class Quoter
             Font quoteFontSmaller = ff.CreateFont(quoteSizeSmaller, FontStyle.Bold);
             float textWidth = (width - pfpSize);
             float textHeight = (height - 2 * marginY);
+            float originY = offsetMediaAndQuote ? (height * (1 - THIN_IMG_OFFSET)) / 2 : height / 2;
             RichTextOptions quoteOpt = new(quoteFont)
             {
-                Origin = new(marginX + textWidth / 2, height / 2),
+                Origin = new(marginX + textWidth / 2, originY),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 WrappingLength = textWidth,
@@ -310,18 +404,18 @@ internal static partial class Quoter
         return quoteBaseplate;
     }
 
-    private static string GetReplyString(DiscordMessage refMsg)
+    private static string GetReplyString(DiscordMessage refMsg, DiscordClient clint, DiscordGuild? guild)
     {
         if (refMsg is null || refMsg.Author is null) return "";
-        if (refMsg.MessageType != MessageType.Reply && refMsg.MessageType != MessageType.Default) return "";
+        if (refMsg.MessageType != DiscordMessageType.Reply && refMsg.MessageType != DiscordMessageType.Default) return "";
         
         if (string.IsNullOrEmpty(refMsg.Content))
         {
-            if (refMsg.Stickers.Count != 0)
+            if (refMsg.Stickers is not null && refMsg.Stickers.Count != 0)
                 return $"A \"{refMsg.Stickers[0].Name}\" sticker from {GetAuthorString(refMsg)}";
             if (refMsg.Attachments.Count != 0)
             {
-                string mimeType = refMsg.Attachments[0].MediaType.Split("/")[0];
+                string mimeType = refMsg.Attachments[0].MediaType?.Split("/")[0] ?? "";
                 string attachmentFile;
                 string anA = mimeType[0] switch
                 {
@@ -342,12 +436,14 @@ internal static partial class Quoter
             }
         }
 
-        return $"Replying to \"{Shorten(refMsg.Content.Replace("\n", ""), 30)}\" from {GetAuthorString(refMsg)}";
+        return $"Replying to \"{Shorten(CleanContent(refMsg, clint, guild), 30).Replace("\n", "")}\" from {GetAuthorString(refMsg)}";
     }
 
     private static string GetAuthorString(DiscordMessage msg)
     {
-        if (Config.values.useServerProfile && msg.Channel.Type != ChannelType.Private)
+        if (msg.Author is null) return "someone";
+
+        if (Config.values.useServerProfile && msg.Channel is not null && msg.Channel.Type != DiscordChannelType.Private)
         {
             try
             {

@@ -72,11 +72,11 @@ internal static class Logger
         logStatements.PushBack(fileString);
     }
 
-    public static string EnsureShorterThan(string str, int maxLen)
+    public static string EnsureShorterThan(string str, int maxLen, string cutoffSignifier = "...")
     {
         if (str.Length < maxLen) return str;
 
-        return str[..(maxLen - 3)] + "...";
+        return str[..(maxLen - cutoffSignifier.Length)] + cutoffSignifier;
     }
 
     static string GetPutTime() => DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(maxPutDateLength);

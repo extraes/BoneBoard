@@ -43,6 +43,26 @@ internal class Config
     public DayOfWeek frogRoleAvailableOn = DayOfWeek.Wednesday;
     public int leaderboardUpdatePeriodMin = 5;
 
+    public ulong confessionalChannel = 0;
+    public ulong confessionalRole = 0;
+    [TomlInlineComment("Options: NONE, ROLE, COOLDOWN")]
+    public ConfessionalRequirements confessionalRestrictions = ConfessionalRequirements.ROLE | ConfessionalRequirements.COOLDOWN;
+
+    public double bufferTimeMinutes = 6 * 60; // 6 hours
+    public ulong[] bufferExemptRoles = Array.Empty<ulong>();
+
+    [TomlPrecedingComment("Supplementary words to the wordsource")]
+    public string hangmanMessageLink = "";
+    public string hangmanMessageFormat = "";
+    public string[] hangmanWords = Array.Empty<string>();
+    public string hangmanWordSource = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt";
+    public string wordSourceSeparator = "\n";
+
+    public ulong[] casinoRoleIds = Array.Empty<ulong>();
+
+    public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromMedia = new() { { "1", [2, 3] } };
+    public ulong[] channelsWhereNoVowelsAreAllowed = Array.Empty<ulong>();
+
     static Config()
     {
         Console.WriteLine("Initializing config");
