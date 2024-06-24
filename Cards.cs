@@ -168,9 +168,9 @@ internal static class Cards
             }
         }
 
-        public void Shuffle()
+        public void Shuffle(int seed = -1)
         {
-            Random rng = new();
+            Random rng = seed == -1 ? new() : new(seed);
             int n = cards.Count;
             while (n > 1)
             {

@@ -227,7 +227,7 @@ internal class Casino
         }
         
         var deck = new Cards.Deck();
-        deck.Shuffle();
+        deck.Shuffle((int)ctx.Interaction.Id);
 
         await ctx.DeferResponseAsync(ephemeral);
 
@@ -387,7 +387,8 @@ internal class Casino
         Cards.Deck deck = new();
         deck.Exclude(dealerHand);
         deck.Exclude(playerHand);
-        deck.Shuffle();
+        deck.Shuffle((int)(interaction.Channel.Id ^ interaction.User.Id));
+        //deck.Shuffle();
 
         if (dealerHand.Count == 1)
         {
