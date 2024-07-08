@@ -141,6 +141,15 @@ internal class Casino
 
                 string emojis = slotMachineEmojis.Random() + " " + slotMachineEmojis.Random() + " " + slotMachineEmojis.Random();
                 builder.WithContent("Rolling...\n" + emojis);
+
+
+                if (amountGambled > PersistentData.values.casinoPoints[ctx.User.Id])
+                {
+                    builder.WithContent("https://tenor.com/view/money-wallet-broke-gif-7855913");
+                    await ctx.EditFollowupAsync(followup.Id, builder);
+                    return;
+                }
+
                 await ctx.EditFollowupAsync(followup.Id, builder);
             }
 
@@ -155,6 +164,9 @@ internal class Casino
             builder.WithContent("Rolling....\n" + emojisFinal);
             await ctx.EditFollowupAsync(followup.Id, builder);
             await Task.Delay(1000);
+
+            if (amountGambled > PersistentData.values.casinoPoints[ctx.User.Id])
+                builder.WithContent("https://tenor.com/view/money-wallet-broke-gif-7855913");
 
 
             // as if the above code wasnt bad... below is even fucking worse. BLUGH.
@@ -575,14 +587,14 @@ internal class Casino
         }
     }
 
-    [Command("blackjack"), Description("Play blackjack!")]
+    [Command("blackjack"), Description("Play blackjack! (Shown to everyone)")]
     public static async Task StartBlackjack(SlashCommandContext ctx,
-        [Parameter("amount"), Description("How many points to gamble.")] long amount,
-        [Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
+        [Parameter("amount"), Description("How many points to gamble.")] long amount)
+        //[Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
     {
         //if (await Guard(ctx))
         //    return;
 
-        await BoneBot.Bots[ctx.Client].casino.BeginBlackjack(ctx, (int)amount, ephemeral);
+        await BoneBot.Bots[ctx.Client].casino.BeginBlackjack(ctx, (int)amount, false);
     }
 }
