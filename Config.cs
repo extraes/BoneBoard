@@ -61,7 +61,31 @@ internal class Config
     public ulong[] casinoRoleIds = Array.Empty<ulong>();
 
     public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromMedia = new() { { "1", [2, 3] } };
+    [TomlPrecedingComment("includes stickers & rxns")]
+    public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromCustomEmojis = new() { { "1", [2, 3] } };
+    public Dictionary<string, string[]> channelsWhereAllFlagsButListedAreProhibited = new() { { "1", ["2", "3"] } };
     public ulong[] channelsWhereNoVowelsAreAllowed = Array.Empty<ulong>();
+
+    public ulong[] channelsWhereMessagesMustHaveMinPercOfAWord = Array.Empty<ulong>();
+    public string[] theWordOrWords = Array.Empty<string>();
+    public float wordPercentage = 0.05f;
+
+    public ulong[] channelsWhereMessagesMustStartWith = Array.Empty<ulong>();
+    public string[] possibleMessageStarts = Array.Empty<string>();
+
+    public string aiConfessionIsBotEmoji = "🤖";
+    public string aiConfessionIsHumanEmoji = "👤";
+    public string openAiToken = "";
+    public string openAiSanityModel = "gpt-4o-mini";
+    public string sanityAffirmative = "Yes";
+    public string sanityNegative = "No";
+    public string openAiConfessionalModel = "gpt-3.5-turbo";
+    public string openAiConfessionalSystemPrompt = "This is a confession bot in a Discord thread. The bot anonymously posts confessions or whatever people are thinking about. When prompted for a confession, **only** include the confession.";
+    public string openAiConfessionalPrompt = "Confess your sins.";
+    public string openAiConfessionalSanityPrompt = "To any text given, respond with \"Yes\", or \"No\", depending on whether or not it is coherent and makes sense to be sent as an anonymous \"confession\" message.";
+    public int confessionalCooldownHoursMin = 24;
+    public int confessionalCooldownHoursMax = 48;
+    public int confessionalAiVotingPeriodHours = 12; 
 
     static Config()
     {

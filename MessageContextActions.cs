@@ -34,9 +34,19 @@ internal class MessageContextActions
             await ctx.RespondAsync("nuh uh", true);
             return;
         }
-        
+
         await ctx.DeferResponseAsync(true);
         Logger.Put($"Quote forced from {ctx.Member} on message {msg.Author}");
+
+        try
+        {
+            msg = await msg.Channel!.GetMessageAsync(msg.Id);
+        }
+        catch (Exception e)
+        {
+            Logger.Put("Caught exception when refetching message: " + e.Message);
+        }
+
         await BoneBot.Bots[ctx.Client].PerformQuote(msg, null);
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }
@@ -64,6 +74,16 @@ internal class MessageContextActions
 
         await ctx.DeferResponseAsync(true);
         Logger.Put($"Quote forced from {ctx.Member} on message {msg}");
+
+
+        try
+        {
+            msg = await msg.Channel!.GetMessageAsync(msg.Id);
+        }
+        catch (Exception e)
+        {
+            Logger.Put("Caught exception when refetching message: " + e.Message);
+        }
 
         if (!DiscordEmoji.TryFromGuildEmote(ctx.Client, Config.values.requiredEmojis.First(), out var emoji))
         {

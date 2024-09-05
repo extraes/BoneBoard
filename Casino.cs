@@ -88,15 +88,17 @@ internal class Casino
         GivePoints(member, points);
     }
 
-    internal void GivePoints(DiscordMember member, int points)
+    internal void GivePoints(ulong userId, int points)
     {
-        if (PersistentData.values.casinoPoints.TryGetValue(member.Id, out var currentPoints))
-            PersistentData.values.casinoPoints[member.Id] = currentPoints + points;
+        if (PersistentData.values.casinoPoints.TryGetValue(userId, out var currentPoints))
+            PersistentData.values.casinoPoints[userId] = Math.Max(0, currentPoints + points);
         else
-            PersistentData.values.casinoPoints[member.Id] = points;
+            PersistentData.values.casinoPoints[userId] = Math.Max(0, points);
 
         PersistentData.WritePersistentData();
     }
+
+    internal void GivePoints(DiscordUser member, int points) => GivePoints(member.Id, points);
 
     internal async Task CheckPoints(SlashCommandContext ctx, bool ephemeral = true)
     {
@@ -237,6 +239,8 @@ internal class Casino
             await ctx.RespondAsync("some time you gotta bag bag to boss up. try half a grand next time.", true);
             return;
         }
+
+        GivePoints(ctx.User, -wager);
         
         var deck = new Cards.Deck();
         deck.Shuffle((int)ctx.Interaction.Id);
@@ -349,11 +353,12 @@ internal class Casino
             await Respond(builder.WithContent("Failed to parse a wager from " + interaction.Data.CustomId));
         }
 
-        if (PersistentData.values.casinoPoints.TryGetValue(interaction.User.Id, out int points) && points < wager)
-        {
-            await Respond(builder.WithContent("You don't have enough points to wager!"));
-            return;
-        }
+        // it now deducts points on interaction start
+        //if (PersistentData.values.casinoPoints.TryGetValue(interaction.User.Id, out int points) && points < wager)
+        //{
+        //    await Respond(builder.WithContent("You don't have enough points to wager!"));
+        //    return;
+        //}
 
         if (!Cards.TryParse(strings[4], out var dealerHand))
         {
@@ -471,21 +476,22 @@ internal class Casino
                 if (playerValStand < dealerValStand && dealerValStand < 22)
                 {
                     // lose
-                    PersistentData.values.casinoPoints[interaction.User.Id] -= wager;
-                    PersistentData.WritePersistentData();
+                    // points are deducted on interaction start. dont double-deduct
                     builder.WithContent(builder.Content + $"\nYou lost your {wager} points! You now have {PersistentData.values.casinoPoints[interaction.User.Id]} points!");
 
                 }
                 else if (playerValStand == dealerValStand)
                 {
                     // tie
+                    // give back points deducted on start
+                    GivePoints(userId, wager);
                     builder.WithContent(builder.Content + "\nIt's a tie! You get your points back.");
                 }
                 else
                 {
                     // win
-                    PersistentData.values.casinoPoints[interaction.User.Id] += wager;
-                    PersistentData.WritePersistentData();
+                    // give back points deducted on start, and then the extra points won
+                    GivePoints(userId, wager * 2);
                     builder.WithContent(builder.Content + $"\nYou won your {wager} point wager! You now have {PersistentData.values.casinoPoints[interaction.User.Id]} points!");
                 }
                 await Respond(builder);
@@ -556,11 +562,10 @@ internal class Casino
     {
         await BoneBot.Bots[ctx.Client].casino.CheckPoints(ctx, ephemeral);
     }
-
     
     [Command("slots"), Description("GAMBLING GAMBLING GAMBLING")]
-    public static async Task GambleSlots(SlashCommandContext ctx,
-        [Parameter("amount"), Description("How many points to gamble.")] long amount,
+    public static async Task GambleSlotsCmd(SlashCommandContext ctx,
+        [Parameter("amount"), Description("How many points to gamble.")] int amount,
         [Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
     {
         await BoneBot.Bots[ctx.Client].casino.GambleSlots(ctx, (int)amount, ephemeral);
@@ -569,7 +574,7 @@ internal class Casino
     [Command("givePoints"), Description("Give a user points")]
     [RequirePermissions(DiscordPermissions.None, SlashCommands.MDOERATOR_PERMS)]
     public static async Task GivePoints(SlashCommandContext ctx,
-        [Parameter("amount"), Description("How many points to give.")] long amount,
+        [Parameter("amount"), Description("How many points to give.")] int amount,
         [Parameter("sendTo"), Description("Who to give points to.")] DiscordMember user)
     {
         if (await SlashCommands.ModGuard(ctx, true))
@@ -589,7 +594,7 @@ internal class Casino
 
     [Command("blackjack"), Description("Play blackjack! (Shown to everyone)")]
     public static async Task StartBlackjack(SlashCommandContext ctx,
-        [Parameter("amount"), Description("How many points to gamble.")] long amount)
+        [Parameter("amount"), Description("How many points to gamble.")] int amount)
         //[Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
     {
         //if (await Guard(ctx))

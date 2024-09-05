@@ -8,12 +8,17 @@ using DSharpPlus.EventArgs;
 using DSharpPlus.Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using OpenAI;
+using OpenAI.Chat;
+using SixLabors.Fonts.Tables.AdvancedTypographic;
 using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -55,6 +60,8 @@ internal partial class BoneBot
     // cool confessional
     DiscordChannel? confessionalChannel;
     Dictionary<DiscordMember, DateTime> confessions = new();
+    List<DiscordMessage> confesssionsByAi = new();
+    OpenAIClient? openAiClient;
 
     // boneboard
     DiscordChannel? quoteOutputChannel;
@@ -88,7 +95,7 @@ internal partial class BoneBot
         {
             try
             {
-                await client.ReconnectAsync(false);
+                await client.ReconnectAsync();
                 Logger.Put("Reconnected on " + client.CurrentUser);
             }
             catch (Exception ex)
@@ -102,14 +109,24 @@ internal partial class BoneBot
     {
         //Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.addconsole)
         clientBuilder = DiscordClientBuilder.CreateDefault(token, DiscordIntents.GuildMessages | DiscordIntents.MessageContents | DiscordIntents.GuildMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers);
-        clientBuilder.SetLogLevel(LogLevel.Trace);
-        clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
+        //clientBuilder.SetLogLevel(LogLevel.Trace);
+        //clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
         clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Trace)));
         clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(BoneBot), this));
         casino = new(this);
         hangman = new(this);
 
-        //commandsExtension.AddProcessorAsync()
+        SlashCommandProcessor scp = new();
+        MessageCommandProcessor mcp = new();
+        clientBuilder.UseCommands(ce =>
+        {
+            ce.AddProcessors(scp, mcp);
+            ce.AddCommands([typeof(SlashCommands), typeof(MessageContextActions), typeof(Casino), typeof(Hangman)]);
+        }, new()
+        {
+            //ServiceProvider = sc.BuildServiceProvider(),
+            RegisterDefaultCommandProcessors = false
+        });
 
         clientBuilder.ConfigureEventHandlers(e =>
         {
@@ -120,7 +137,12 @@ internal partial class BoneBot
                 .HandleMessageUpdated(MessageUpdated);
         });
         client = clientBuilder.Build();
-        
+
+        if (!string.IsNullOrEmpty(Config.values.openAiToken))
+        {
+            openAiClient = new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
+        }
+
         Bots.Add(client, this);
     }
 
@@ -128,7 +150,7 @@ internal partial class BoneBot
     {
         if (client is not null)
             return;
-            //throw new InvalidOperationException("Cannot add events after client is built!");
+        //throw new InvalidOperationException("Cannot add events after client is built!");
 
         clientBuilder.ConfigureEventHandlers(action);
     }
@@ -136,23 +158,13 @@ internal partial class BoneBot
     public async void Init()
     {
         //todo re-add commands
-        var commandsExtension = client.UseCommands(new()
-        {
-            //ServiceProvider = sc.BuildServiceProvider(),
-            RegisterDefaultCommandProcessors = false
-        });
-
-        SlashCommandProcessor scp = new();
-        MessageCommandProcessor mcp = new();
-        await commandsExtension.AddProcessorsAsync(scp, mcp);
-        commandsExtension.AddCommands([typeof(SlashCommands), typeof(MessageContextActions), typeof(Casino), typeof(Hangman)]);
-
 
         await client.ConnectAsync();
 
         try
         {
             UpdateLeaderboard();
+            OccasionalAiConfessional();
         }
         catch (Exception ex)
         {
@@ -236,26 +248,25 @@ internal partial class BoneBot
         DiscordMember? member = args.Author as DiscordMember;
         bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermissions.ManageMessages);
 
-        if (!hasManageMessages && Config.values.channelsWhereNoVowelsAreAllowed.Contains(args.Channel.Id) && args.Message.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase)))
+        if (!hasManageMessages)
         {
-            bool isValidGuess = args.Message.Content.Length == 1 && char.IsLetter(args.Message.Content[0])
-                             || args.Message.Content.Length == PersistentData.values.currHangmanWord.Length;
-            bool replyingToHangman = args.Message.ReferencedMessage?.JumpLink.OriginalString == Config.values.hangmanMessageLink;
-            if (!replyingToHangman || !isValidGuess)
+            string? messageDeleteReason = await GetDeleteReasonIfNotAllowed(args.Message);
+            if (messageDeleteReason is not null)
             {
                 try
                 {
-                    await args.Message.DeleteAsync("has vowels. cnat do that.,");
+                    await args.Message.DeleteAsync(messageDeleteReason);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Failed to delete message with vowels! ", ex);
+                    Logger.Warn($"Failed to delete message with reason {messageDeleteReason}", ex);
                 }
+                return;
             }
         }
 
-        if (Config.values.channelsWhereUsersAreProhibitedFromMedia.TryGetValue(args.Channel.Id.ToString(), out ulong[]? userIds) && userIds.Contains(args.Author.Id))
+        if (Config.values.channelsWhereUsersAreProhibitedFromMedia.TryGetValue(args.Channel.Id.ToString(), out ulong[]? mediaUserIds) && mediaUserIds.Contains(args.Author.Id))
         {
             if (args.Message.Attachments.Count > 0 || args.Message.Embeds.Count > 0)
             {
@@ -271,12 +282,125 @@ internal partial class BoneBot
             }
         }
 
+        if (Config.values.channelsWhereUsersAreProhibitedFromCustomEmojis.TryGetValue(args.Channel.Id.ToString(), out ulong[]? emojiUserIds) && emojiUserIds.Contains(args.Author.Id))
+        {
+            string? reason = null;
+            if (args.Message.Stickers?.FirstOrDefault()?.Type == DiscordStickerType.Guild) // false if no stickers
+                reason = "this user gets no stickers in this channel. woe.";
+
+            
+            if (Quoter.CustomEmoji.IsMatch(args.Message.Content)) //todo: ignore emojis from args.Guild 
+                reason = "this user cant use custom emojis in this channel. woe.";
+
+            try
+            {
+                if (reason is not null)
+                {
+                    await args.Message.DeleteAsync(reason);
+                    return;
+                }
+                
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to delete message with custom emoji from {member}! ", ex);
+            }
+        }
+
+        if (Config.values.channelsWhereAllFlagsButListedAreProhibited.TryGetValue(args.Channel.Id.ToString(), out string[]? allowedFlags) && args.Message.Content.Length >= 4)
+        {
+            const char REG_INDIC_START = '\ud83c';
+            // long story short: country flags (like :flag_us:) are just two "regional indicator" emojis
+            // but each "regional indicator" emoji is a pair of two unicode characters, each starting with \ud83c
+            DiscordEmoji? lastRegional = null;
+            char lastChar = ' ';
+            foreach (char c in args.Message.Content)
+            {
+                if (char.GetUnicodeCategory(c) != UnicodeCategory.Surrogate) // "flush" last regional indicator if the curr char cant be a part of a reg indic
+                    lastRegional = null;
+                
+
+                if (lastChar == REG_INDIC_START && char.GetUnicodeCategory(c) == UnicodeCategory.Surrogate)
+                {
+                    if (DiscordEmoji.TryFromUnicode(lastChar.ToString() + c, out DiscordEmoji? regionalIndicator))
+                    {
+                        if (lastRegional is null)
+                        {
+                            // prepare to check if this is a valid flag
+                            lastRegional = regionalIndicator;
+                            lastChar = c;
+                            continue;
+                        }
+                        else
+                        {
+                            // check if its a full valid flag
+                            string flag = lastRegional.Name + regionalIndicator.Name;
+                            if (DiscordEmoji.TryFromUnicode(flag, out DiscordEmoji? compoundEmoji) && !allowedFlags.Contains(compoundEmoji.Name))
+                            {
+                                try
+                                {
+                                    await args.Message.DeleteAsync("you must rep the right flag in this channel. woe.");
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Warn($"Failed to delete message with flag emoji from {member}! ", ex);
+                                }
+                            }
+                        }
+                    }
+                    else
+                        Logger.Warn($"Failed to parse emoji from {lastChar}{c} - it should be a regional indicator, no? See full message: {args.Message}");
+                }
+
+
+                lastChar = c;
+            }
+        }
+
+
         if (Config.values.frogRoleActivation == FrogRoleActivation.REPLY)
             await FrogRoleMessageCreated(client, args);
 
         bool isBufferExempt = member is not null && member.Roles.Any(r => Config.values.bufferExemptRoles.Contains(r.Id));
         if (PersistentData.values.bufferedChannels.Contains(args.Channel.Id) && !isBufferExempt && !IsMe(args.Author))
             await BufferMessage(args.Message);
+    }
+
+    private async Task<string?> GetDeleteReasonIfNotAllowed(DiscordMessage msg)
+    {
+        ulong channelId = msg.Channel?.Id ?? default;
+        string checkWordsAgainst = msg.Content.Replace('’', '\'').Replace("'", "");
+        if (channelId == default)
+            return null;
+
+        string[] words = checkWordsAgainst.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        float wordPercentage = words.Length == 0 ? 1 : words.Count(w => Config.values.theWordOrWords.Any(s => s.Equals(w, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
+        bool wordPercTooLowInChannel = Config.values.channelsWhereMessagesMustHaveMinPercOfAWord.Contains(channelId) && wordPercentage < Config.values.wordPercentage;
+
+        bool needsToStartWithString = Config.values.channelsWhereMessagesMustStartWith.Contains(channelId) && words.Length != 0;
+        bool startsWithString = Config.values.possibleMessageStarts.Any(s => checkWordsAgainst.StartsWith(s, StringComparison.InvariantCultureIgnoreCase));
+
+        bool hasVowelInDisallowedChannel = Config.values.channelsWhereNoVowelsAreAllowed.Contains(channelId) && msg.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase));
+
+        bool isValidHangmanGuess = msg.Content.Length == 1 && char.IsLetter(msg.Content[0])
+                             || msg.Content.Length == PersistentData.values.currHangmanWord.Length;
+        bool replyingToHangman = msg.ReferencedMessage?.JumpLink.OriginalString == Config.values.hangmanMessageLink;
+        bool isProperHangman = replyingToHangman && isValidHangmanGuess;
+
+        if (!isProperHangman)
+        {
+            if (hasVowelInDisallowedChannel)
+                return "has vowels. cnat edit to do that., u tried'";
+
+            if (wordPercTooLowInChannel)
+                return "message doesn't contain enough of the necessary words";
+
+            if (needsToStartWithString && !startsWithString)
+                return "doesnt start with the right string";
+        }
+
+        return null;
     }
 
     private async Task MessageUpdated(DiscordClient sender, MessageUpdatedEventArgs args)
@@ -318,6 +442,40 @@ internal partial class BoneBot
         if (Config.values.blockedUsers.Contains(args.User.Id))
             return;
 
+        if (Config.values.channelsWhereUsersAreProhibitedFromCustomEmojis.TryGetValue(args.Channel.Id.ToString(), out ulong[]? emojiUserIds) && emojiUserIds.Contains(args.User.Id))
+        {
+            if (args.Emoji.RequiresColons)
+            {
+
+                try
+                {
+                    await args.Message.DeleteReactionAsync(args.Emoji, args.User, "this user cant use custom emojis in this channel. woe.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Failed to delete custom emoji reaction on message from {args.User}! ", ex);
+                }
+            }
+        }
+
+        if (Config.values.channelsWhereAllFlagsButListedAreProhibited.TryGetValue(args.Channel.Id.ToString(), out string[]? allowedFlags))
+        {
+            // this is gonna stop things that are custom emojis with flag_ in them, but that's a small price to pay (and also the white flag)
+            if (args.Emoji.Id == 0 && args.Emoji.GetDiscordName().Contains("flag_") && !allowedFlags.Contains(args.Emoji.Name))
+            {
+                try
+                {
+                    await args.Message.DeleteReactionAsync(args.Emoji, args.User, "you must rep the right flag in this channel. woe.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Failed to delete custom emoji reaction on message from {args.User}! ", ex);
+                }
+            }
+        }
+
         if (Config.values.frogRoleActivation == FrogRoleActivation.REACTION)
             await FrogRoleReactionAdded(client, args);
 
@@ -352,7 +510,7 @@ internal partial class BoneBot
 
         assigningNewKing = true;
 
-        foreach (DiscordUser user in await args.Message.GetReactionsAsync(args.Emoji, 25))
+        await foreach(DiscordUser user in args.Message.GetReactionsAsync(args.Emoji))
         {
             if (user == args.User || user == client.CurrentUser)
                 continue;
@@ -375,15 +533,18 @@ internal partial class BoneBot
         if (args.Channel.IsPrivate || args.User is not DiscordMember member) return;
         if (!MemberReactionCounts(member)) return;
 
-        IReadOnlyList<DiscordUser> usersThatReacted;
         List<DiscordMember> membersThatReacted;
         try
         {
-            usersThatReacted = await args.Message.GetReactionsAsync(args.Emoji, 25);
             membersThatReacted = new();
-            foreach (DiscordUser user in usersThatReacted)
+            await foreach (DiscordUser user in args.Message.GetReactionsAsync(args.Emoji))
             {
+                //todo: remove this check and rely on internal cache maybe
+                if (IsMe(user))
+                    return; // already reacted
+
                 DiscordMember memb = await args.Guild.GetMemberAsync(user.Id);
+                
                 membersThatReacted.Add(memb);
             }
         }
@@ -393,14 +554,13 @@ internal partial class BoneBot
             return;
         }
 
-        //todo: remove this check and rely on internal cache maybe
-        if (usersThatReacted.Any(IsMe)) return; // already reacted
 
         if (membersThatReacted.Where(MemberReactionCounts).Count() < Config.values.requiredReactionCount)
             return;
 
         try
         {
+            Logger.Put("Now quoting message " + args.Message);
             await PerformQuote(args.Message, args.Emoji);
         }
         catch (Exception ex)
@@ -582,9 +742,116 @@ internal partial class BoneBot
         }
     }
 
+    async void OccasionalAiConfessional()
+    {
+        while (true)
+        {
+            try
+            {
+                int dist = Config.values.confessionalCooldownHoursMax - Config.values.confessionalCooldownHoursMin;
+                double hours = Config.values.confessionalCooldownHoursMin + (dist * Random.Shared.NextDouble());
+                TimeSpan wait = TimeSpan.FromHours(hours);
+                await Task.Delay(wait);
+
+                Logger.Put("Time for an AI confession!");
+                await SendAiConfessional();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Exception in occasional AI confessional! " + ex);
+            }
+        }
+    }
+
+    internal async Task SendAiConfessional()
+    {
+        if (confessionalChannel is null)
+            return;
+
+        DiscordMember botInServer;
+        try
+        {
+            botInServer = await confessionalChannel.Guild.GetMemberAsync(client.CurrentUser.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Bot not found in server/other exception while trying to get member object for {client.CurrentUser} in {confessionalChannel?.Guild}! " + ex);
+            return;
+        }
+
+        if (openAiClient is null)
+            return;
+
+        string mainModel = Config.values.openAiConfessionalModel;
+        string mainSysPrompt = Config.values.openAiConfessionalSystemPrompt;
+        string mainUserPrompt = Config.values.openAiConfessionalPrompt;
+        string sanityModel = Config.values.openAiSanityModel;
+        string sanitySysPrompt = Config.values.openAiConfessionalSanityPrompt;
+        string sanityUserPrompt = Config.values.openAiConfessionalSanityPrompt;
+        if (string.IsNullOrEmpty(mainModel) || string.IsNullOrEmpty(mainSysPrompt) || string.IsNullOrEmpty(mainUserPrompt) || string.IsNullOrEmpty(sanityModel) || string.IsNullOrEmpty(sanitySysPrompt) || string.IsNullOrEmpty(sanityUserPrompt))
+            return;
+
+        Logger.Put("Now generating an AI confession!");
+
+        var mainClient = openAiClient.GetChatClient(Config.values.openAiConfessionalModel);
+        var sanityClient = openAiClient.GetChatClient(Config.values.openAiSanityModel);
+        ChatCompletionOptions mainOptions = new()
+        {
+            MaxTokens = 256,
+            Temperature = 0.5f,
+        };
+
+        string chatResponse = "j";
+        bool sanitySignoff = false;
+        for (int i = 0; i < 25; i++)
+        {
+            var mainPrompt = new ChatMessage[]
+            {
+                new SystemChatMessage(mainSysPrompt),
+                new UserChatMessage(mainUserPrompt)
+            };
+            var mainRes = await mainClient.CompleteChatAsync(mainPrompt, mainOptions);
+
+            chatResponse = mainRes.Value.ToString();
+            if (string.IsNullOrEmpty(chatResponse))
+                continue;
+
+
+            Logger.Put($"Got AI response for round {i + 1} - {chatResponse}");
+
+            var altPrompt = new ChatMessage[]
+            {
+                new SystemChatMessage(sanitySysPrompt),
+                new UserChatMessage(chatResponse)
+            };
+
+            var sanityRes = await sanityClient.CompleteChatAsync(altPrompt);
+            string sanityResponse = sanityRes.Value.ToString();
+            Logger.Put($"Got AI sanitychecker response for round {i + 1} - {sanityResponse}");
+
+
+            if (string.IsNullOrEmpty(sanityResponse))
+                continue;
+            if (sanityResponse.Contains(Config.values.sanityAffirmative, StringComparison.CurrentCultureIgnoreCase))
+            {
+                Logger.Put("Sanity check passed, posting confession!");
+                sanitySignoff = true;
+                break;
+            }
+        }
+
+        if (!sanitySignoff)
+            return;
+
+
+        DiscordMessage? message = await SendConfessional(botInServer, chatResponse);
+        if (message is not null)
+            confesssionsByAi.Add(message);
+    }
+
     bool MemberReactionCounts(DiscordMember member)
     {
-        if (member.IsBot)
+        if (member.IsBot || Config.values.blockedUsers.Contains(member.Id))
             return false;
 
         foreach (DiscordRole role in member.Roles)
@@ -610,6 +877,12 @@ internal partial class BoneBot
         if (logChannel is null)
         {
             Logger.Warn("Unrecommended to continue performing quotes! Log channel is null!");
+        }
+
+        if (msg.Author is not null && Config.values.blockedUsers.Contains(msg.Author.Id))
+        {
+            Logger.Put("Bailing on quote. Message author is in blocked user list");
+            return;
         }
 
         try
@@ -639,7 +912,7 @@ internal partial class BoneBot
 
         DiscordMessageBuilder dmb = new DiscordMessageBuilder()
                                         .AddFile("quote.png", ms)
-                                        .WithContent($"[From {displayName}]({msg.JumpLink})");
+                                        .WithContent($"[From {displayName.Replace("]", "")}]({msg.JumpLink})");
 
         try
         {
@@ -737,17 +1010,38 @@ internal partial class BoneBot
         if (confessionalChannel is null)
             return null;
 
-        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.ROLE))
+
+        if (!IsMe(member))
         {
-            if (member.Roles.All(r => r.Id != Config.values.confessionalRole))
-                return null;
+            if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.ROLE))
+            {
+                if (member.Roles.All(r => r.Id != Config.values.confessionalRole))
+                    return null;
+            }
+
+            if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
+            {
+                if (confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+                    return null;
+                confessions[member] = DateTime.Now;
+            }
         }
 
-        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
+        string[] slurPatterns =
         {
-            if (confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+            "*fag*",
+            "niga",
+            "niger",
+            "*nigg*",
+        };
+
+        foreach (string pattern in slurPatterns)
+        {
+            if (Microsoft.VisualBasic.CompilerServices.LikeOperator.LikeString(text, pattern, Microsoft.VisualBasic.CompareMethod.Text))
+            {
+                Logger.Put($"The confession '{text}' failed against the pattern {pattern} and is rejected.");
                 return null;
-            confessions[member] = DateTime.Now;
+            }
         }
 
         Logger.Put($"Going to send a msg in the confessional channel #{confessionalChannel.Name} - {text}");
@@ -760,17 +1054,97 @@ internal partial class BoneBot
             .WithAllowedMentions(Enumerable.Empty<IMention>())
             .AddEmbed(deb);
 
-        string authorString = $"{member.Username} - id {member.Id}";
+        string authorString = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{member.Username} - id {member.Id}"));
         try
         {
             DiscordMessage msg = await confessionalChannel.SendMessageAsync(dmb);
-            Logger.Put($"Confession sent was from the following B64-encoded user: {Convert.ToBase64String(Encoding.UTF8.GetBytes(authorString))}", LogType.Debug);
+
+            if (!IsMe(member))
+                Logger.Put($"Confession sent was from the following B64-encoded user: {authorString}", LogType.Debug);
+            else
+                Logger.Put($"Confession sent by an AI. Be proud of your little bot. It's trying.", LogType.Debug);
+
+            HandleConfessionVotingFor(msg);
             return msg;
         }
         catch (Exception ex)
         {
             Logger.Warn($"Failed to send a confessional by {authorString} - {ex}");
             return null;
+        }
+
+    }
+
+    async void HandleConfessionVotingFor(DiscordMessage msg)
+    {
+        if (openAiClient is null)
+            return;
+
+        DiscordEmoji? botEmoji, humanEmoji;
+        try
+        {
+            if (!DiscordEmoji.TryFromUnicode(Config.values.aiConfessionIsBotEmoji, out botEmoji))
+                if (ulong.TryParse(Config.values.aiConfessionIsBotEmoji, out ulong botEmojiId))
+                    DiscordEmoji.TryFromGuildEmote(client, botEmojiId, out botEmoji);
+
+            if (!DiscordEmoji.TryFromUnicode(Config.values.aiConfessionIsHumanEmoji, out humanEmoji))
+                if (ulong.TryParse(Config.values.aiConfessionIsHumanEmoji, out ulong humanEmojiId))
+                    DiscordEmoji.TryFromGuildEmote(client, humanEmojiId, out botEmoji);
+
+            if(botEmoji is null)
+            {
+                Logger.Put($"Failed to get DiscordEmoji from '{Config.values.aiConfessionIsBotEmoji}' for confessional AI-or-not reactions! Bailing!");
+                return;
+            }
+
+            if (humanEmoji is null)
+            {
+                Logger.Put($"Failed to get DiscordEmoji from '{Config.values.aiConfessionIsHumanEmoji}' for confessional AI-or-not reactions! Bailing!");
+                return;
+            }
+
+            await msg.CreateReactionAsync(humanEmoji);
+            await msg.CreateReactionAsync(botEmoji);
+        }
+        catch(Exception ex)
+        {
+            Logger.Warn("Exception while adding emoji for confessional AI-or-not reactions!", ex);
+            return;
+        }
+
+        await Task.Delay(TimeSpan.FromHours(Config.values.confessionalAiVotingPeriodHours));
+
+        bool isAi = confesssionsByAi.Contains(msg);
+
+        try
+        {
+            DiscordEmbedBuilder deb = new(msg.Embeds[0]);
+            deb.WithFooter(isAi ? "From an AI" : "From a human");
+            await msg.ModifyAsync(deb.Build());
+        }
+        catch(Exception ex)
+        {
+            Logger.Warn($"Exception when editing confession message ({msg}) to reveal ground-truth!", ex);
+        }
+
+        try
+        {
+            DiscordEmoji correctEmoji = isAi ? botEmoji : humanEmoji;
+            DiscordEmoji incorrectEmoji = isAi ? humanEmoji : botEmoji;
+            var correctUsers = msg.GetReactionsAsync(correctEmoji).ToBlockingEnumerable();
+            var incorrectUsers = msg.GetReactionsAsync(incorrectEmoji).ToBlockingEnumerable();
+            
+            foreach (DiscordUser user in correctUsers)
+            {
+                if (incorrectUsers.Contains(user))
+                    casino.GivePoints(user, -2000);
+                else
+                    casino.GivePoints(user, isAi ? 1000 : 100);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Exception giving out points for confessional AI voting! ", ex);
         }
     }
 
@@ -786,6 +1160,11 @@ internal partial class BoneBot
                 if (attachment.FileSize > fileSizeLimit)
                 {
                     Logger.Put($"Attachment {attachment.FileName} on message {msg.JumpLink} is too big to buffer! ({Math.Round(attachment.FileSize / 1024.0 / 1024.0, 2)}MB > {Math.Round(fileSizeLimit / 1024.0 / 1024.0, 2)}MB)");
+                    continue;
+                }
+                if (string.IsNullOrEmpty(attachment.Url))
+                {
+                    Logger.Error("Attachment on message " + msg.JumpLink + " has no URL!");
                     continue;
                 }
 

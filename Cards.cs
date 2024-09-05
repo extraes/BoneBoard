@@ -156,6 +156,7 @@ internal static class Cards
     public class Deck
     {
         private readonly List<Card> cards = new();
+        private readonly List<Card> discarded = new();
 
         public Deck()
         {
@@ -182,8 +183,18 @@ internal static class Cards
 
         public Card Draw()
         {
-            Card card = cards[0];
-            cards.RemoveAt(0);
+            int iter = 0;
+            Card card;
+            do
+            {
+                if (cards.Count == 0)
+                    return new Card(Suit.Hearts, Rank.Jack); // Default card if deck is empty
+
+                card = cards[iter % cards.Count];
+                cards.RemoveAt(iter % cards.Count);
+                iter++;
+            } while (discarded.Contains(card));
+
             return card;
         }
 
@@ -192,6 +203,7 @@ internal static class Cards
             foreach (Card card in cards)
             {
                 this.cards.Remove(card);
+                discarded.Add(card);
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using SixLabors.Fonts;
+using SixLabors.Fonts.Unicode;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Drawing.Processing;
@@ -8,6 +9,7 @@ using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace BoneBoard;
@@ -31,19 +33,29 @@ internal static partial class Quoter
     private static partial Regex BakedRegex_Link();
 
     internal static readonly Regex CustomEmoji = BakedRegex_CustomEmoji();
-    [GeneratedRegex(@"<a?:([\w0-9]+):[0-9]+>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
+    [GeneratedRegex(@"<a?:([\w0-9]+):([0-9]+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
     private static partial Regex BakedRegex_CustomEmoji();
 
-    static HttpClient pfpGetter = new();
-    static HttpClient mediaGetter = new();
+    static readonly HttpClient pfpGetter = new();
+    static readonly HttpClient mediaGetter = new();
+    static readonly HttpClient emojiGetter = new();
+    const string CUSTOM_EMOJI_SUBSTITUTE = "🔲";
+    static readonly List<Match> matchedCustomEmojis = new();
+    static readonly ConditionalWeakTable<string, Image> emojiImageCache = new();
 
     public static async Task<Image?> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)
     {
         if (msg.Author is null || msg.Channel is null)
             return null;
 
+        bool isConfession = msg.Channel.Id == Config.values.confessionalChannel
+                         && msg.Content.Length == 0
+                         && msg.Author == clint.CurrentUser
+                         && msg.Embeds.Count > 0;
+        DiscordEmbed? confessionEmbed =  isConfession ? msg.Embeds[0] : null;
         bool global = !Config.values.useServerProfile;
         //string extraText; might re-add later?
+        string startingContent = isConfession ? confessionEmbed?.Description ?? msg.Content : msg.Content;
         string pfpUrl;
         string name;
         string cleanContent;
@@ -71,8 +83,17 @@ internal static partial class Quoter
             }
         }
 
+        if (isConfession)
+        {
+            DiscordEmbedFooter? footer = confessionEmbed!.Footer;
+            if (footer?.Text?.Contains("AI") ?? false)
+                name = "OpenAI's finest finetune";
+            else
+                name = "Anonymous confessor";
+        }
+
         MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
-        cleanContent = UserMention.Replace(msg.Content, userMentionEvaluator);
+        cleanContent = UserMention.Replace(startingContent, userMentionEvaluator);
 
         MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
         cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
@@ -138,7 +159,10 @@ internal static partial class Quoter
             }
         }
 
-        cleanContent = CustomEmoji.Replace(cleanContent, @":$1:");
+        List<Match> customEmojis = matchedCustomEmojis;
+        customEmojis.Clear();
+        MatchEvaluator emojiMentionEvaluator = match => { customEmojis.Add(match); return CUSTOM_EMOJI_SUBSTITUTE; };
+        cleanContent = CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
 
         if (string.IsNullOrWhiteSpace(cleanContent) && media is null)
             subtext = "So true...";
@@ -150,20 +174,200 @@ internal static partial class Quoter
         if (cleanContent == "<Link>")
             cleanContent = "";
 
-        return Quotify(img, name, cleanContent, msg.Timestamp.Year, subtext, media);
+        GlyphReplacer? emojiDrawer = null;
+        List<int> indices = GetIndicesOf(cleanContent, CUSTOM_EMOJI_SUBSTITUTE).ToList(); // the beginning quote is added to the string lol
+        if (customEmojis.Count == 0)
+            emojiDrawer = null;
+        else if (customEmojis.Count == indices.Count)
+        {
+            List<Image?> emojis = await FetchCustomEmojis(customEmojis);
+
+            emojiDrawer = (quoteImages, allGlyphs, blockBounds, lineCount) =>
+            {
+                (Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) = quoteImages;
+                //float lineHeight = blockBounds.Height / lineCount;
+                //float currX = 0;
+                //float currY = 0;
+
+                ////var indicesEnumerator = indices.GetEnumerator();
+                //int currEmojiIdx = 0;
+
+                //for(int i = 0; i < allGlyphs.Length; i++)
+                //{
+                //    GlyphBounds bounds = allGlyphs[i];
+                //    currX += bounds.Bounds.Width;
+                //    if (currX > blockBounds.Width)
+                //    {
+                //        currX = 0;
+                //        currY += lineHeight;
+                //        //continue;
+                //    }
+
+                //    if (currEmojiIdx >= indices.Count)
+                //        break;
+
+                //    if (i >= indices[currEmojiIdx])
+                //    {
+                //        var emoji = emojis[currEmojiIdx];
+                //        currEmojiIdx++;
+                //        if (emoji is not null)
+                //        {
+                //            var emojiRect = new Rectangle((int)(currX + blockBounds.X), (int)(currY + blockBounds.Y), (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
+                //            quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
+                //        }
+                //    }
+
+                //    i += bounds.Codepoint.Utf16SequenceLength - 1;
+                //}
+
+                //int remap = 0; // so it can be reused, otherwise indices[i] without remap would throw an exception when slicing
+                //for (int i = 0; i < indices.Count; i++)
+                //{
+                //    if (emojis[i] is null)
+                //        continue;
+
+                //    int sliceTo = Math.Clamp(indices[i] + remap - 1, 0, int.MaxValue);
+                //    remap = 0;
+                //    foreach (GlyphBounds pastBound in allGlyphs.Slice(0, sliceTo))
+                //    {
+                //        remap -= pastBound.Codepoint.Utf16SequenceLength - 1;
+                //    }
+
+
+                //    var bounds = allGlyphs[indices[i] + remap];
+                //    var emoji = emojis[i]!;
+                //    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
+                //    emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width) }));
+                //    quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
+                //}
+
+                //for (int i = 0; i < cleanContent.Length; i++)
+                //{
+                //    if (i >= indices.Count)
+                //        break;
+
+                //    var emoji = emojis[i];
+                //    if (emoji is null)
+                //        continue;
+
+                //    var bounds = allGlyphs[i];
+                //    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
+                //    emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width) }));
+                //    quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
+                //}
+
+                //int stringToGlyphOffset = 0;
+                var emojiEnumerator = emojis.GetEnumerator();
+                while (emojiEnumerator.Current is null)
+                    emojiEnumerator.MoveNext();
+
+                GlyphBounds bounds;
+                for (int i = 0; i < allGlyphs.Length; i+= bounds.Codepoint.Utf16SequenceLength)
+                {
+                    bounds = allGlyphs[i];
+                    if (CUSTOM_EMOJI_SUBSTITUTE != bounds.Codepoint.ToString())
+                    {
+                        continue;
+                    }
+
+                    var emoji = emojiEnumerator.Current;
+                    if (emoji is null)
+                    {
+                        emojiEnumerator.MoveNext();
+                        continue;
+                    }
+
+                    var brush = new SolidBrush(Color.White);
+                    //quoteBeforeText.Mutate(x => x.Skew(20, 10));
+                    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
+                    var rebackRect = new RectangleF((int)Math.Floor(bounds.Bounds.X), (int)Math.Floor(bounds.Bounds.Y), (int)Math.Ceiling(bounds.Bounds.Width) + 1, (int)Math.Ceiling(bounds.Bounds.Width) + 1);
+                    ImageBrush brushImage = new(quoteBeforeText, rebackRect);
+                    quoteAfterText.Mutate(x => x.Fill(brushImage, rebackRect));
+
+                    if (emoji.Height < emoji.Width)
+                    {
+                        emoji = emoji.Clone(x => x.Pad(emoji.Width, emoji.Width));
+                    }
+                    else if (emoji.Width < emoji.Height)
+                    {
+                        emoji = emoji.Clone(x => x.Pad(emoji.Height, emoji.Height));
+                    }
+                    emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width), Position = AnchorPositionMode.Center }));
+
+                    quoteAfterText.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
+
+                    emojiEnumerator.MoveNext();
+                    continue;
+                }
+            };
+        }
+        else
+        {
+            //int idx = 0;
+            //foreach (Match match in customEmojis)
+            //{
+
+            //}
+        }
+
+        return Quotify(img, name, cleanContent, msg.Timestamp.Year, subtext, media, glyphReplacer: emojiDrawer);
     }
 
-    static string CleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
+    static async Task<List<Image?>> FetchCustomEmojis(List<Match> matches)
+    {
+        List<Image?> images = new(matches.Count);
+        foreach (Match emojiMatch in matches)
+        {
+            var id = emojiMatch.Groups[2].Value;
+            
+            if (emojiImageCache.TryGetValue(id, out var img))
+            {
+                images.Add(img);
+                continue;
+            }
+
+            string url = $"https://cdn.discordapp.com/emojis/{id}.png?size=320&quality=lossless";
+            try
+            {
+                using Stream stream = await emojiGetter.GetStreamAsync(url);
+                Image<Rgba32> emoji = await Image.LoadAsync<Rgba32>(stream);
+                emojiImageCache.Add(id, emoji);
+                images.Add(emoji);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to fetch emoji image from URL {url}.", ex);
+                images.Add(null);
+                continue;
+            }
+        }
+
+        return images;
+    }
+
+    static IEnumerable<int> GetIndicesOf(string str, string substr)
+    {
+        int idx = 0;
+        while (true)
+        {
+            idx = str.IndexOf(substr, idx);
+            if (idx == -1)
+                yield break;
+            yield return idx;
+            idx++;
+        }
+    }
+
+    static string QuickCleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
     {
         string cleanContent = msg.Content;
-        MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, guild));
+        MatchEvaluator userMentionEvaluator = match => ReplaceIdWithUser(match, clint, guild);
         cleanContent = UserMention.Replace(cleanContent, userMentionEvaluator);
 
-        MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
+        MatchEvaluator channelMentionEvaluator = match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild);
         cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
 
-        cleanContent = CustomEmoji.Replace(cleanContent, @":$1:");
-
+        cleanContent = CustomEmoji.Replace(cleanContent, ":$1:");
 
         cleanContent = Link.Replace(cleanContent, "<Link>");
 
@@ -210,7 +414,12 @@ internal static partial class Quoter
             return "@Role";
 
         ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-        string? name = guild.GetRole(id)?.Name;
+        string? name = null;
+        try
+        {
+            name = guild.GetRoleAsync(id).GetAwaiter().GetResult().Name;
+        }
+        catch { }
 
         // to date i dont think name has been null, this should be fine
         if (name is null)
@@ -238,14 +447,15 @@ internal static partial class Quoter
             //DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
             //name = user?.GlobalName ?? user?.Username;
         }
-
+        
         // to date i dont think name has been null, this should be fine
         if (name is null)
             return "#channel";
         else return $"#{name}";
     }
 
-    public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512)
+    public delegate void GlyphReplacer((Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) quoteImages, ReadOnlySpan<GlyphBounds> allGlyphs, FontRectangle textblockBounds, int lineCount);
+    public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
     {
         name = name.Replace("\n", " ").Trim();
         quote = "\"" + quote + "\"";
@@ -322,8 +532,23 @@ internal static partial class Quoter
             }
             else
             {
+                static float Lerp(float a, float b, float t) // unclamped
+                {
+                    return a + (b - a) * t;
+                }
+                int yTenPerc = (int)Lerp(mediaBottomRight.Y, mediaTopLeft.Y, 0.1f);
+                int yNinetyPerc = (int)Lerp(mediaBottomRight.Y, mediaTopLeft.Y, 0.9f);
+                int xTenPerc = (int)Lerp(mediaBottomRight.X, mediaTopLeft.X, 0.1f);
+                int xNinetyPerc = (int)Lerp(mediaBottomRight.X, mediaTopLeft.X, 0.9f);
                 lgbt = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaTopLeft.X, mediaTopLeft.Y), GradientRepetitionMode.None, halfBlackStart, transparentEnd);
+                lgbtq = new(mediaBottomRight, new Point(mediaBottomRight.X, yTenPerc), GradientRepetitionMode.None, blackStart, transparentEnd);
+                lgbtqia = new(mediaBottomRight, new Point(xTenPerc, mediaBottomRight.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
+                LinearGradientBrush lgbtqiaa = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaBottomRight.X, yNinetyPerc), GradientRepetitionMode.None, blackStart, transparentEnd);
+
                 quoteBaseplate.Mutate(x => x.Fill(lgbt, mediaRect));
+                quoteBaseplate.Mutate(x => x.Fill(lgbtq, mediaRect));
+                quoteBaseplate.Mutate(x => x.Fill(lgbtqia, mediaRect));
+                quoteBaseplate.Mutate(x => x.Fill(lgbtqiaa, mediaRect));
 
                 if (!string.IsNullOrEmpty(extraText))
                 {
@@ -360,11 +585,28 @@ internal static partial class Quoter
             {
                 Font = quoteFontSmaller
             };
-            bool sameLineCount = TextMeasurer.CountLines(quote, quoteOpt) == TextMeasurer.CountLines(quote, quoteOptSmaller);
-            if (sameLineCount)
-                quoteBaseplate.Mutate(x => x.DrawText(quoteOpt, quote, Color.White));
+            int normalLineCount = TextMeasurer.CountLines(quote, quoteOpt);
+            int smallerLineCount = TextMeasurer.CountLines(quote, quoteOptSmaller);
+            bool sameLineCount = normalLineCount == smallerLineCount;
+            
+            RichTextOptions quoteOptFinal = sameLineCount ? quoteOpt : quoteOptSmaller;
+            int lineCount = sameLineCount ? normalLineCount : smallerLineCount;
+            
+            //quoteBaseplate.Mutate(x => x.DrawText(quoteOptFinal, quote, Color.White)); moved into if blocks
+            
+            if (glyphReplacer is not null && TextMeasurer.TryMeasureCharacterBounds(quote, quoteOptFinal, out var charBounds))
+            {
+                Image<Rgba32> pretextBaseplate = quoteBaseplate.CloneAs<Rgba32>();
+                quoteBaseplate.Mutate(x => x.DrawText(quoteOptFinal, quote, Color.White));
+
+                ReadOnlySpan<GlyphBounds> boundsWithoutQuotes = charBounds[1..^1];
+                var textBounds = TextMeasurer.MeasureBounds(quote, quoteOptFinal);
+                glyphReplacer((pretextBaseplate, quoteBaseplate), boundsWithoutQuotes, textBounds, lineCount);
+            }
             else
-                quoteBaseplate.Mutate(x => x.DrawText(quoteOptSmaller, quote, Color.White));
+            {
+                quoteBaseplate.Mutate(x => x.DrawText(quoteOptFinal, quote, Color.White));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(extraText))
@@ -407,6 +649,7 @@ internal static partial class Quoter
     private static string GetReplyString(DiscordMessage refMsg, DiscordClient clint, DiscordGuild? guild)
     {
         if (refMsg is null || refMsg.Author is null) return "";
+        if (Config.values.blockedUsers.Contains(refMsg.Author.Id)) return "";
         if (refMsg.MessageType != DiscordMessageType.Reply && refMsg.MessageType != DiscordMessageType.Default) return "";
         
         if (string.IsNullOrEmpty(refMsg.Content))
@@ -436,7 +679,7 @@ internal static partial class Quoter
             }
         }
 
-        return $"Replying to \"{Shorten(CleanContent(refMsg, clint, guild), 30).Replace("\n", "")}\" from {GetAuthorString(refMsg)}";
+        return $"Replying to \"{Shorten(QuickCleanContent(refMsg, clint, guild), 30).Replace("\n", "")}\" from {GetAuthorString(refMsg)}";
     }
 
     private static string GetAuthorString(DiscordMessage msg)

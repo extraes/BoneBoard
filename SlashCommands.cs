@@ -274,4 +274,19 @@ internal class SlashCommands
         var builder = new DiscordFollowupMessageBuilder().WithContent("Flushed buffered messages in all servers 👍.");
         await ctx.FollowupAsync(builder);
     }
+
+    [Command("sendAiConfession"), Description("Sends an AI confession.")]
+    [RequirePermissions(DiscordPermissions.None, MDOERATOR_PERMS)]
+    public static async Task TestSendAiConfession(SlashCommandContext ctx)
+    {
+        if (await ModGuard(ctx))
+            return;
+
+        Logger.Put($"Prompting AI confession at the request of {ctx.User}.");
+        await ctx.DeferResponseAsync(true);
+
+        await BoneBot.Bots[ctx.Client].SendAiConfessional();
+
+        await ctx.FollowupAsync("Attempted AI confession.");
+    }
 }
