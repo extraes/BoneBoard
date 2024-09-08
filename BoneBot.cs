@@ -335,16 +335,25 @@ internal partial class BoneBot
                         {
                             // check if its a full valid flag
                             string flag = lastRegional.Name + regionalIndicator.Name;
-                            if (DiscordEmoji.TryFromUnicode(flag, out DiscordEmoji? compoundEmoji) && !allowedFlags.Contains(compoundEmoji.Name))
+                            if (DiscordEmoji.TryFromUnicode(flag, out DiscordEmoji? compoundEmoji))
                             {
-                                try
+                                if (allowedFlags.Contains(compoundEmoji.Name))
                                 {
-                                    await args.Message.DeleteAsync("you must rep the right flag in this channel. woe.");
-                                    return;
+                                    lastRegional = null; // flush so flags can exist without a space in between
+                                    lastChar = c;
+                                    continue;
                                 }
-                                catch (Exception ex)
+                                else
                                 {
-                                    Logger.Warn($"Failed to delete message with flag emoji from {member}! ", ex);
+                                    try
+                                    {
+                                        await args.Message.DeleteAsync("you must rep the right flag in this channel. woe.");
+                                        return;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.Warn($"Failed to delete message with flag emoji from {member}! ", ex);
+                                    }
                                 }
                             }
                         }
