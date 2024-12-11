@@ -6,13 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.0.0-beta.3" />
     <PackageReference Include="CircularBuffer" Version="1.4.0" />
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02358" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02358" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02358" />
+    <PackageReference Include="Csv" Version="2.0.93" />
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02405" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02405" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02405" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0-preview.7.24405.7" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0-preview.7.24405.7" />
     <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />

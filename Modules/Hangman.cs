@@ -1,4 +1,5 @@
-﻿using DSharpPlus;
+﻿using BoneBoard.Modules;
+using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
@@ -8,6 +9,7 @@ using DSharpPlus.EventArgs;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Text;
@@ -17,10 +19,9 @@ namespace BoneBoard;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("hang")]
-internal partial class Hangman
+internal partial class Hangman : ModuleBase
 {
     const string VOWELS = "aeiou";
-    BoneBot bot;
     string[] possibleWords = Array.Empty<string>();
     DiscordMessage? hangmanMessage;
 
@@ -43,25 +44,47 @@ internal partial class Hangman
         DiscordEmoji.FromUnicode("✅"),
     };
 
-    public Hangman(BoneBot bot)
+    public Hangman(BoneBot bot) : base(bot)
     {
-        this.bot = bot;
-        bot.ConfigureEvents(e =>
-        {
-            e.HandleMessageCreated(HandleHangman);
-        });
+        //bot.ConfigureEvents(e =>
+        //{
+        //    e.HandleMessageCreated(HandleHangman);
+        //});
     }
+
+    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    {
+        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
+        {
+            if (IsHangmanGuess(msgCreatedArgs.Message))
+            {
+                try
+                {
+                    await HandleHangman(bot.client, msgCreatedArgs);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Exception while handling hangman guess", ex);
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    [MemberNotNullWhen(true, nameof(hangmanMessage))]
+    public bool IsHangmanGuess(DiscordMessage msg) =>
+           hangmanMessage is not null
+        && !string.IsNullOrWhiteSpace(PersistentData.values.currHangmanWord)
+        && msg.ReferencedMessage == hangmanMessage && msg.ChannelId == hangmanMessage.ChannelId
+        && (msg.Content.Length == 1 || msg.Content.Length == PersistentData.values.currHangmanWord.Length)
+        && PersistentData.values.currHangmanWord.Contains(' ') == msg.Content.Contains(' '); // this means the message was probably not a guess, and was more likely just a comment on the game
 
     private async Task HandleHangman(DiscordClient sender, MessageCreatedEventArgs args)
     {
-        if (hangmanMessage is null || string.IsNullOrWhiteSpace(PersistentData.values.currHangmanWord))
+        if (!IsHangmanGuess(args.Message))
             return;
-
-        if (args.Channel != hangmanMessage.Channel || args.Message.ReferencedMessage != hangmanMessage)
-            return;
-
-        if (!PersistentData.values.currHangmanWord.Contains(' ') && args.Message.Content.Contains(' '))
-            return; // this means the message was probably not a guess, and was more likely just a comment on the game
 
         Logger.Put("hangman attempt: " + args.Message.Content);
 
@@ -116,10 +139,13 @@ internal partial class Hangman
         }
     }
 
-    public async Task Init()
+    protected override async Task FetchGuildResources()
     {
         await FetchMessage();
+    }
 
+    protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
+    {
         await GetWords();
 
         Logger.Put("Hangman initialized with...");
@@ -214,7 +240,7 @@ internal partial class Hangman
 
     public async Task NewHangmanMessage()
     {
-        if (hangmanMessage is null || string.IsNullOrWhiteSpace(Config.values.hangmanMessageFormat))
+        if (hangmanMessage?.Channel is null || string.IsNullOrWhiteSpace(Config.values.hangmanMessageFormat))
             return;
 
 
@@ -241,10 +267,12 @@ internal partial class Hangman
     }
 
     [Command("createMsg"), Description("Creates the message that will be used for hangman. \\n will be replaced w newline")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MDOERATOR_PERMS)]
+    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
     public static async Task CreateHangmanMsg(SlashCommandContext ctx,
-        [Parameter("msgContent"), Description("{0} -> word, {1} -> hangman, {2} -> guesses")] string content)
+        [Parameter("msgContent"), Description("{0} -> word, {1} -> hangman, {2} -> guesses")] string content = "")
     {
+        if (string.IsNullOrWhiteSpace(content))
+            content = Config.values.hangmanMessageFormat;
         if (await SlashCommands.ModGuard(ctx))
             return;
 
@@ -261,7 +289,7 @@ internal partial class Hangman
     }
 
     [Command("start"), Description("Starts a new hangman game!")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MDOERATOR_PERMS)]
+    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
     public static async Task StartHangman(SlashCommandContext ctx,
         [Parameter("word"), Description("Force the word to be one of your choosing")] string word = "")
     {

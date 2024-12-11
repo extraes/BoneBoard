@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
@@ -13,6 +14,7 @@ namespace BoneBoard;
 internal class Config
 {
     public static event Action? ConfigChanged;
+
     public static Config values;
     private const string CFG_PATH = "./config.toml";
     internal string token = "";
@@ -25,6 +27,8 @@ internal class Config
     public ulong[] requiredRoles = Array.Empty<ulong>();
     public ulong[] requiredEmojis = Array.Empty<ulong>();
     public int requiredReactionCount = 3;
+    [TomlInlineComment("https://discord.com/channels/563139253542846474/1153819135067832370/1283700275617468416")]
+    public string quoteeDeleteEmoji = "emoji id, like 1283700275617468416";
     public ulong logChannel = 0;
     public ulong outputChannel = 0;
     public int maxLogFiles = 5;
@@ -51,9 +55,9 @@ internal class Config
     public double bufferTimeMinutes = 6 * 60; // 6 hours
     public ulong[] bufferExemptRoles = Array.Empty<ulong>();
 
-    [TomlPrecedingComment("Supplementary words to the wordsource")]
     public string hangmanMessageLink = "";
     public string hangmanMessageFormat = "";
+    [TomlPrecedingComment("Supplementary words to the wordsource")]
     public string[] hangmanWords = Array.Empty<string>();
     public string hangmanWordSource = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt";
     public string wordSourceSeparator = "\n";
@@ -73,6 +77,10 @@ internal class Config
     public ulong[] channelsWhereMessagesMustStartWith = Array.Empty<ulong>();
     public string[] possibleMessageStarts = Array.Empty<string>();
 
+    public ulong[] channelsWhereMessagesMustConformToFormat = Array.Empty<ulong>();
+    public string[] theFormatInQuestion = [ "she", "on my", "till i" ];
+
+    public string confessionCsvPath = "./confessions.csv";
     public string aiConfessionIsBotEmoji = "🤖";
     public string aiConfessionIsHumanEmoji = "👤";
     public string openAiToken = "";
@@ -85,7 +93,22 @@ internal class Config
     public string openAiConfessionalSanityPrompt = "To any text given, respond with \"Yes\", or \"No\", depending on whether or not it is coherent and makes sense to be sent as an anonymous \"confession\" message.";
     public int confessionalCooldownHoursMin = 24;
     public int confessionalCooldownHoursMax = 48;
-    public int confessionalAiVotingPeriodHours = 12; 
+    public int confessionalAiVotingPeriodHours = 12;
+
+    public ulong pollsterAutoWatchForumId = 0;
+    public string[] pollsterCategories = Array.Empty<string>();
+    public int pollsterMaxVal = 5;
+    public DateTime pollsterEndTime = DateTime.Now;
+    public ulong roundRobinBumpForumId = 0;
+    public ulong[] roundRobinBumpIgnoreThreads = Array.Empty<ulong>();
+    public string roundRobinBumpMessage = "Bump <:CamobiDog:764589139118784572>";
+
+    public ulong imageRoyaleVotingChannel = 0;
+    public ulong imageRoyaleSendChannel = 0;
+    public ulong imageRoyaleRole = 0;
+    public string imageRoyaleSendTime = "12:00";
+    [TomlInlineComment("Unicode emoji or emoji id")]
+    public string imageRoyaleVoteEmoji = "👍";
 
     static Config()
     {

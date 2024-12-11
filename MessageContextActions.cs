@@ -47,7 +47,7 @@ internal class MessageContextActions
             Logger.Put("Caught exception when refetching message: " + e.Message);
         }
 
-        await BoneBot.Bots[ctx.Client].PerformQuote(msg, null);
+        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, null);
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }
 
@@ -94,7 +94,7 @@ internal class MessageContextActions
             return;
         }
 
-        await BoneBot.Bots[ctx.Client].PerformQuote(msg, emoji);
+        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, emoji);
 
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }

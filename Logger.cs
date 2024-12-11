@@ -38,15 +38,18 @@ internal static class Logger
     }
 
 
-    public static void Error(string str) => Put(str, LogType.Fatal, false);
-    public static void Error(string str, Exception ex) => Put(str + "\n\t" + ex.ToString(), LogType.Fatal, false);
+    public static void Error(string str) => PutInternal(str, LogType.Fatal, false);
+    public static void Error(string str, Exception ex) => PutInternal(str + "\n\t" + ex.ToString(), LogType.Fatal, false);
 
-    public static void Warn(string str) => Put(str, LogType.Warn, false);
-    public static void Warn(string str, Exception ex) => Put(str + "\n\t" + ex.ToString(), LogType.Warn, false);
+    public static void Warn(string str) => PutInternal(str, LogType.Warn, false);
+    public static void Warn(string str, Exception ex) => PutInternal(str + "\n\t" + ex.ToString(), LogType.Warn, false);
 
-    public static void Put(string str) => Put(str, LogType.Normal);
+    public static void Put(string str) => PutInternal(str, LogType.Normal);
 
-    public static void Put(string str, LogType reason, bool cleanMultiline = true)
+    public static void Put(string str, LogType reason, bool cleanMultiline = true) => PutInternal(str, reason, cleanMultiline);
+
+    // private method so that GetCaller always has a consistent count of frames to ignore
+    private static void PutInternal(string str, LogType reason, bool cleanMultiline = true)
     {
         if (string.IsNullOrWhiteSpace(str)) str = "<N/A>";
         else if (cleanMultiline) str = str.Replace("\r\n", " // ").Replace("\n", " // ");
@@ -83,12 +86,17 @@ internal static class Logger
 
     static string GetCaller()
     {
-        StackTrace trace = new(2, true);
+        StackTrace trace = new(1, true);
         foreach (StackFrame frame in trace.GetFrames())
         {
             MethodBase? method = frame.GetMethod();
             Type? decType = method?.DeclaringType;
             if (method is null || decType is null) continue;
+
+            if (IsMoveNext(decType))
+            {
+                return string.Concat(decType.DeclaringType!.Name, ".", decType.Name.Split('>').First().AsSpan(1));
+            }
 
             //if (decType != typeof(Logger) && decType != typeof(DiscordLogger) && IsTypeLoggable(decType))
             //{
@@ -102,5 +110,11 @@ internal static class Logger
     {
         // all this to avoid seeing "<MainAsync>d__1.MoveNext"
         return t.GetCustomAttribute(typeof(CompilerGeneratedAttribute)) is null && t.Assembly == typeof(Logger).Assembly;
+    }
+
+
+    static bool IsMoveNext(Type t)
+    {
+        return t.GetCustomAttribute(typeof(CompilerGeneratedAttribute)) is not null && t.GetInterfaces().Any(i => i == typeof(IAsyncStateMachine));
     }
 }
