@@ -1,4 +1,7 @@
 ﻿using DSharpPlus;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Trees.Metadata;
+using DSharpPlus.Commands;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using SixLabors.ImageSharp;
@@ -8,11 +11,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DSharpPlus.Commands.ContextChecks;
+using System.ComponentModel;
 
 namespace BoneBoard.Modules;
 
+[AllowedProcessors(typeof(SlashCommandProcessor))]
+[Command("stargrid")]
 internal class Stargrid : ModuleBase
 {
+    const DiscordPermissions FORCE_QUOTE_PERMS = DiscordPermissions.ManageRoles | DiscordPermissions.ManageMessages;
+
     DiscordChannel? outputChannel;
     public Stargrid(BoneBot bot) : base(bot)
     {
@@ -196,5 +205,177 @@ internal class Stargrid : ModuleBase
                 await msg.DeleteAsync();
             }
         }
+    }
+
+    [Command("manualQuote")]
+    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
+    [RequirePermissions(DiscordPermissions.None, DiscordPermissions.ModerateMembers)]
+    public static async Task ForceQuoteSilent(SlashCommandContext ctx,
+        string quote,
+        int year,
+        string? bottomText = null,
+        string? mediaLink = null,
+        DiscordMember? authorUser = null,
+        [Description("If providing discord user")] bool useServerProfile = false,
+        [Description("Manually specify when not giving discord user")] string? authorName = null,
+        [Description("Manually specify pfp url")] string? authorImage = null)
+    {
+        string currentStatus = "start quote";
+        HttpClient clint = new();
+        Image author;
+        Image? media = null;
+
+        if (authorName is null && authorUser is null)
+        {
+            await ctx.RespondAsync("You must provide either an author name or a discord user to quote.", true);
+            return;
+        }
+        
+        // also nullchecks
+        if (authorUser is DiscordMember authorMember)
+        {
+            if (useServerProfile)
+            {
+                authorName = authorMember.DisplayName;
+                authorImage = authorMember.DisplayAvatarUrl;
+            }
+            else
+            {
+                authorName = authorMember.Username;
+                authorImage = authorMember.AvatarUrl;
+            }
+        }
+        else if (authorName is null)
+        {
+            await ctx.RespondAsync("You must provide an author name to quote.", true);
+            return;
+        }
+        else if (authorImage is null)
+        {
+            await ctx.RespondAsync("You must provide an author image to quote.", true);
+            return;
+        }
+
+        try
+        {
+            currentStatus = "download author image";
+            Stream imageStream = await clint.GetStreamAsync(authorImage);
+            currentStatus = "deserialize author image";
+            author = await Image.LoadAsync(imageStream);
+            if (mediaLink is not null)
+            {
+                currentStatus = "download media image";
+                Stream mediaStream = await clint.GetStreamAsync(mediaLink);
+                currentStatus = "deserialize media image";
+                media = await Image.LoadAsync(mediaStream);
+            }
+        }
+        catch(Exception e)
+        {
+            Logger.Error("Failed to " + currentStatus, e);
+            await ctx.RespondAsync("Failed to " + currentStatus, true);
+            return;
+        }
+
+
+        // Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null
+        Image quoteImage = Quoter.Quotify(author, authorName, quote, year, bottomText ?? "", media);
+
+        using MemoryStream ms = new();
+
+        await quoteImage.SaveAsPngAsync(ms);
+        ms.Position = 0;
+
+        DiscordInteractionResponseBuilder dirb = new DiscordInteractionResponseBuilder()
+                                        .AddFile("quote.png", ms)
+                                        .AsEphemeral(true);
+
+        try
+        {
+            await ctx.RespondAsync(dirb);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Exception while trying to respond to command invoker for quote process's final step!", ex);
+        }
+    }
+
+    [Command("forceQuoteNoRxn")]
+    [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
+    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
+    [RequirePermissions(DiscordPermissions.None, FORCE_QUOTE_PERMS)]
+    public static async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
+    {
+        if (await SlashCommands.ModGuard(ctx, false))
+            return;
+
+        if (ctx.Member is null || !ctx.Member.Permissions.HasPermission(FORCE_QUOTE_PERMS))
+        {
+            await ctx.RespondAsync("nuh uh", true);
+            return;
+        }
+
+        await ctx.DeferResponseAsync(true);
+        Logger.Put($"Quote forced from {ctx.Member} on message {msg.Author}");
+
+        try
+        {
+            msg = await msg.Channel!.GetMessageAsync(msg.Id);
+        }
+        catch (Exception e)
+        {
+            Logger.Put("Caught exception when refetching message: " + e.Message);
+        }
+
+        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, null);
+        await ctx.FollowupAsync("Done! Hopefully.", true);
+    }
+
+    [Command("forceQuote")]
+    [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
+    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
+    [RequirePermissions(DiscordPermissions.AddReactions, FORCE_QUOTE_PERMS)]
+    public static async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
+    {
+        if (await SlashCommands.ModGuard(ctx, false))
+            return;
+
+        if (ctx.Member is null)
+        {
+            await ctx.RespondAsync("😂👎", true);
+            return;
+        }
+
+        if (!ctx.Member.Permissions.HasPermission(FORCE_QUOTE_PERMS))
+        {
+            await ctx.RespondAsync("nuh uh", true);
+            return;
+        }
+
+        await ctx.DeferResponseAsync(true);
+        Logger.Put($"Quote forced from {ctx.Member} on message {msg}");
+
+
+        try
+        {
+            msg = await msg.Channel!.GetMessageAsync(msg.Id);
+        }
+        catch (Exception e)
+        {
+            Logger.Put("Caught exception when refetching message: " + e.Message);
+        }
+
+        if (!DiscordEmoji.TryFromGuildEmote(ctx.Client, Config.values.requiredEmojis.First(), out var emoji))
+        {
+            var dfmbFail = new DiscordFollowupMessageBuilder()
+                        .WithContent("Unable to get reaction emoji... Try using the silent option.")
+                        .AsEphemeral();
+            await ctx.FollowupAsync(dfmbFail);
+            return;
+        }
+
+        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, emoji);
+
+        await ctx.FollowupAsync("Done! Hopefully.", true);
     }
 }

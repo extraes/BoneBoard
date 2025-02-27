@@ -16,10 +16,10 @@ namespace BoneBoard.Modules;
 
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
-[Command("imageroyale")]
-internal class ImageRoyale : ModuleBase
+[Command("videoroyale")]
+internal class VideoRoyale : ModuleBase
 {
-    public ImageRoyale(BoneBot bot) : base(bot) { }
+    public VideoRoyale(BoneBot bot) : base(bot) { }
 
     [ThreadStatic] static HttpClient _clint;
     static HttpClient Clint
@@ -31,7 +31,7 @@ internal class ImageRoyale : ModuleBase
         }
     }
 
-    Timer? sendTimer;
+    Timer sendTimer;
     TimeOnly sendTime;
     DiscordChannel? voteChannel;
     DiscordChannel? outputChannel;
@@ -39,43 +39,51 @@ internal class ImageRoyale : ModuleBase
 
     protected override async Task FetchGuildResources()
     {
-        if (!TimeOnly.TryParse(Config.values.imageRoyaleSendTime, out TimeOnly time))
-            Logger.Warn("Unable to parse image royale send time");
+        if (!TimeOnly.TryParse(Config.values.videoRoyaleSendTime, out TimeOnly time))
+            Logger.Warn("Unable to parse video royale send time");
 
         if (time != default && time != sendTime)
         {
             sendTime = time;
 
             DateTime now = DateTime.Now;
-            DateTime next = new(now.Year, now.Month, sendTime.ToTimeSpan() < now.TimeOfDay ? now.Day + 1 : now.Day, sendTime.Hour, sendTime.Minute, sendTime.Second);
-            sendTimer ??= new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
-            sendTimer.Change(next - now, TimeSpan.FromDays(1));
+            DateTime nextSendTime = new(new DateOnly(now.Year, now.Month, now.Day), sendTime, DateTimeKind.Local);
+            
+            if (nextSendTime.DayOfWeek < Config.values.videoRoyaleSendDay)
+                nextSendTime = nextSendTime.AddDays(Config.values.videoRoyaleSendDay - nextSendTime.DayOfWeek);
+            else if (nextSendTime.DayOfWeek > Config.values.videoRoyaleSendDay)
+                nextSendTime = nextSendTime.AddDays(7 - (nextSendTime.DayOfWeek - Config.values.videoRoyaleSendDay));
+            else if (nextSendTime.TimeOfDay > sendTime.ToTimeSpan())
+                nextSendTime = nextSendTime.AddDays(7);
 
-            Logger.Put($"Waiting {next - now} to send imageroyale", LogType.Debug);
-        }
-
-        try
-        {
-            if (Config.values.imageRoyaleVotingChannel != default)
-                voteChannel = await bot.client.GetChannelAsync(Config.values.imageRoyaleVotingChannel);
-            else
-                Logger.Warn("No voting channel set for image royale");
-        }
-        catch (Exception e)
-        {
-            Logger.Error("Unable to fetch voting channel for image royale", e);
+            TimeSpan waitTime = nextSendTime - now;
+            Logger.Put($"Waiting {waitTime.Days}d {waitTime} to send videoroyale", LogType.Debug);
+            sendTimer ??= new(SendTopVideo, null, nextSendTime - now, TimeSpan.FromDays(7));
+            sendTimer.Change(nextSendTime - now, TimeSpan.FromDays(7));
         }
 
         try
         {
-            if (Config.values.imageRoyaleSendChannel != default)
-                outputChannel = await bot.client.GetChannelAsync(Config.values.imageRoyaleSendChannel);
+            if (Config.values.videoRoyaleVotingChannel != default)
+                voteChannel = await bot.client.GetChannelAsync(Config.values.videoRoyaleVotingChannel);
             else
-                Logger.Warn("No output channel set for image royale");
+                Logger.Warn("No voting channel set for video royale");
         }
         catch (Exception e)
         {
-            Logger.Error("Unable to fetch output channel for image royale", e);
+            Logger.Error("Unable to fetch voting channel for video royale", e);
+        }
+
+        try
+        {
+            if (Config.values.videoRoyaleSendChannel != default)
+                outputChannel = await bot.client.GetChannelAsync(Config.values.videoRoyaleSendChannel);
+            else
+                Logger.Warn("No output channel set for video royale");
+        }
+        catch (Exception e)
+        {
+            Logger.Error("Unable to fetch output channel for video royale", e);
         }
 
         try
@@ -85,43 +93,43 @@ internal class ImageRoyale : ModuleBase
             else if (DiscordEmoji.TryFromUnicode(Config.values.royaleVoteEmoji, out DiscordEmoji unicodeEmoji))
                 voteEmoji = unicodeEmoji;
             else
-                Logger.Warn("No (valid) vote emoji set for image royale");
+                Logger.Warn("No (valid) vote emoji set for video royale");
         }
         catch (Exception e)
         {
-            Logger.Error("Unable to set vote emoji for image royale", e);
+            Logger.Error("Unable to set vote emoji for video royale", e);
         }
 
     }
 
-    private async void SendTopImage(object? state)
+    private async void SendTopVideo(object? state)
     {
         // locally declared because .NET GC can handle it and i want to be able to modify these with hot code replace :^)
-        string[] possibleMessageStrings = GetRoyaleStrings();
+        string[] possibleMessageStrings = ImageRoyale.GetRoyaleStrings();
 
         try
         {
             if (voteChannel is null || outputChannel is null)
             {
-                Logger.Warn("Unable to send top image, voting or output channel is null");
+                Logger.Warn("Unable to send top video, voting or output channel is null");
                 return;
             }
 
             if (voteEmoji is null)
             {
-                Logger.Warn("Unable to send top image, vote emoji is null");
+                Logger.Warn("Unable to send top video, vote emoji is null");
                 return;
             }
 
             int topVotes = 0;
             DiscordMessage? topMessage = null;
 
-            foreach (ulong messageId in PersistentData.values.imageRoyaleSubmissions.Values)
+            foreach (ulong messageId in PersistentData.values.videoRoyaleSubmissions.Values)
             {
                 DiscordMessage? msg = await TryFetchMessage(voteChannel, messageId, true);
                 if (msg is null)
                 {
-                    Logger.Warn($"Unable to find message w/ ID {messageId} for image royale -- ignoring");
+                    Logger.Warn($"Unable to find message w/ ID {messageId} for video royale -- ignoring");
                     continue;
                 }
                 int voteCount = await GetReactionsThatCount(msg);
@@ -145,66 +153,45 @@ internal class ImageRoyale : ModuleBase
 
             if (topMessage is null)
             {
-                Logger.Warn("No top message found for image royale");
+                Logger.Warn("No top message found for video royale");
                 return;
             }
 
-            foreach (ulong userId in PersistentData.values.imageRoyaleSubmissions.Keys)
+            foreach (ulong userId in PersistentData.values.videoRoyaleSubmissions.Keys)
             {
-                if (PersistentData.values.imageRoyaleSubmissions.TryGetValue(userId, out ulong msgId) && msgId == topMessage.Id)
+                if (PersistentData.values.videoRoyaleSubmissions.TryGetValue(userId, out ulong msgId) && msgId == topMessage.Id)
                 {
                     Logger.Put($"Giving user w/ ID {userId} points from winning Image Royale!");
                     bot.casino.GivePoints(userId, 10 * 1000);
                 }
             }
+            
+            Logger.Put($"Top videoroyale message recieved {topVotes} votes @ {topMessage.JumpLink}");
 
-            Logger.Put($"Top imageroyale message recieved {topVotes} votes @ {topMessage.JumpLink}");
 
             var builder = new DiscordMessageBuilder()
-                .WithContent("-# " + possibleMessageStrings.Random())
-                .AddEmbed(new DiscordEmbedBuilder()
-                    .WithImageUrl(topMessage.Attachments[0].Url ?? throw new Exception("Discord's API is some ass! Who knew? An attachment URL was somehow NULL. bruh!"))
-                    .WithFooter("A gift from your benefactors..."));
+                .WithContent($"[A gift from your benefactors...]({topMessage.Attachments[0].Url ?? throw new Exception("Discord's API is some ass! Who knew? An attachment URL was somehow NULL. bruh!")})" +
+                "\n-# " + possibleMessageStrings.Random());
 
             var outputMsg = await outputChannel.SendMessageAsync(builder);
-            Logger.Put($"Sent image royale message! Link: {outputMsg.JumpLink}");
+            Logger.Put($"Sent video royale message! Link: {outputMsg.JumpLink}");
 
-            PersistentData.values.imageRoyaleSubmissions.Clear();
+            PersistentData.values.videoRoyaleSubmissions.Clear();
             PersistentData.WritePersistentData();
 
             try
             {
                 await voteChannel.SendMessageAsync($"the winrar was {topMessage.JumpLink}, now go check out the post in {outputChannel.Name}, {outputMsg.JumpLink}");
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
                 Logger.Warn("exception sending notification message in vote channel!", ex);
             }
         }
         catch (Exception e)
         {
-            Logger.Error("Failed to send top image", e);
+            Logger.Error("Failed to send top video", e);
         }
-    }
-
-    public static string[] GetRoyaleStrings()
-    {
-        return [
-            "Consider the following",
-            "yall seen this?",
-            "what yall know bout this?",
-            "your mom just sent me this",
-            "they found this on bin laden's hard drive",
-            "im gonna get pulled over and show the cop this on my phone",
-            "ummm i uhhh ummmm uhmmm uhhhh",
-            "woaw",
-            "i paid some dude $200 for the newest iphone but he ghosted me and sent me this",
-            "scientists attempted to reconstruct what someone was looking at after capturing brain signals. this is the result",
-            "this is the last thing my wife sent me before the divorce",
-            "As previously stated,",
-            "I hope this email finds you well,",
-            "chat is this real",
-        ];
     }
 
     private async Task<int> GetReactionsThatCount(DiscordMessage msg)
@@ -220,7 +207,7 @@ internal class ImageRoyale : ModuleBase
                 if (reactor.IsBot)
                     continue;
 
-                if (PersistentData.values.imageRoyaleSubmissions.TryGetValue(reactor.Id, out ulong msgId) && msgId == msg.Id)
+                if (PersistentData.values.videoRoyaleSubmissions.TryGetValue(reactor.Id, out ulong msgId) && msgId == msg.Id)
                 {
                     Logger.Put($"lol {reactor} reacted to their own message, laugh at them, that shit not counted");
                     continue;
@@ -245,18 +232,18 @@ internal class ImageRoyale : ModuleBase
     //    throw new NotImplementedException();
     //}
 
-    [Command("sendnow"), Description("Force-sends the top image immediately")]
+    [Command("sendnow"), Description("Force-sends the top video immediately")]
     [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
     public static async Task SendNow(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
 
-        BoneBot.Bots[ctx.Client].imageRoyale.SendTopImage(null);
+        BoneBot.Bots[ctx.Client].videoRoyale.SendTopVideo(null);
     }
 
-    [Command("submit"), Description("Submit an image or gif!")]
-    public static async Task Submit(SlashCommandContext ctx, DiscordAttachment image)
+    [Command("submit"), Description("Submit a video!")]
+    public static async Task Submit(SlashCommandContext ctx, DiscordAttachment video)
     {
         if (ctx.User is not DiscordMember member || ctx.Guild is null)
         {
@@ -264,13 +251,13 @@ internal class ImageRoyale : ModuleBase
             return;
         }
 
-        if (!member.Roles.Any(r => r.Id == Config.values.imageRoyaleRole))
+        if (!member.Roles.Any(r => r.Id == Config.values.videoRoyaleSubmitRole))
         {
             await ctx.RespondAsync("https://tenor.com/view/ignore-this-pls-gif-24452155", true);
             return;
         }
 
-        ImageRoyale royale = BoneBot.Bots[ctx.Client].imageRoyale;
+        VideoRoyale royale = BoneBot.Bots[ctx.Client].videoRoyale;
 
         if (royale.voteChannel is null)
         {
@@ -278,16 +265,16 @@ internal class ImageRoyale : ModuleBase
             return;
         }
 
-        if (PersistentData.values.imageRoyaleSubmissions.TryGetValue(member.Id, out ulong preexistingMsgId))
+        if (PersistentData.values.videoRoyaleSubmissions.TryGetValue(member.Id, out ulong preexistingMsgId))
         {
-            await ctx.RespondAsync($"you already submitted an image, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}/{preexistingMsgId})", true);
+            await ctx.RespondAsync($"you already submitted a video, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}/{preexistingMsgId})", true);
             return;
         }
 
-        if (!(image.MediaType?.StartsWith("image") ?? false))
+        if (!(video.MediaType?.StartsWith("video") ?? false))
         {
-            Logger.Put($"Non-image file (MIME '{image.MediaType ?? "null!!"}') submitted to image royale  " + image.Url);
-            await ctx.RespondAsync("not an image bwomp", true);
+            Logger.Put($"Non-video file (MIME '{video.MediaType ?? "null!!"}') submitted to video royale  " + video.Url);
+            await ctx.RespondAsync("not a video bwomp", true);
             return;
         }
         
@@ -299,17 +286,17 @@ internal class ImageRoyale : ModuleBase
             _ => 10 * 1024 * 1024
         };
 
-        if (image.FileSize > filesizeLimit)
+        if (video.FileSize > filesizeLimit)
         {
             await ctx.RespondAsync("file too big", true);
             return;
         }
 
-        string? extension = Path.GetExtension(image.FileName)?.Split('?')[0];
+        string? extension = Path.GetExtension(video.FileName)?.Split('?')[0];
         if (extension is null)
         {
-            Logger.Put("Couldn't find a file extension for image submission @ " + image.Url);
-            await ctx.RespondAsync("uhhhh no extension? tell the dev to look for the url " + image.Url, true);
+            Logger.Put("Couldn't find a file extension for video submission @ " + video.Url);
+            await ctx.RespondAsync("uhhhh no extension? tell the dev to look for the url " + video.Url, true);
             return;
         }
 
@@ -318,13 +305,13 @@ internal class ImageRoyale : ModuleBase
         try
         {
             using var fs = File.OpenWrite(tmpPath);
-            using var stream = await Clint.GetStreamAsync(image.ProxyUrl);
+            using var stream = await Clint.GetStreamAsync(video.ProxyUrl);
             await stream.CopyToAsync(fs);
         }
         catch (Exception e)
         {
-            Logger.Error("Failed to write image to temp file for image submission", e);
-            await ctx.RespondAsync("failed to write image to temp file", true);
+            Logger.Error("Failed to write video to temp file for video submission", e);
+            await ctx.RespondAsync("failed to write video to temp file", true);
             return;
         }
 
@@ -333,19 +320,19 @@ internal class ImageRoyale : ModuleBase
             using var fs = File.OpenRead(tmpPath);
 
             var dumb = new DiscordMessageBuilder()
-                .WithContent($"CONTENDER {PersistentData.values.imageRoyaleSubmissions.Count + 1}")
-                .AddFile("imageroyale" + extension, fs);
+                .WithContent($"VIDEO ROYALE CONTENDER {PersistentData.values.videoRoyaleSubmissions.Count + 1}")
+                .AddFile("videoroyale" + extension, fs);
 
-            Logger.Put($"{member} submitted a file originally named {image.FileName} to image royale");
+            Logger.Put($"{member} submitted a file originally named {video.FileName} to video royale");
                 
             DiscordMessage msg = await royale.voteChannel.SendMessageAsync(dumb);
-            PersistentData.values.imageRoyaleSubmissions[member.Id] = msg.Id;
+            PersistentData.values.videoRoyaleSubmissions[member.Id] = msg.Id;
             PersistentData.WritePersistentData();
 
             if (royale.voteEmoji is not null)
                 await BoneBot.TryReact(msg, royale.voteEmoji);
 
-            await ctx.RespondAsync($"submitted image, check https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}", true);
+            await ctx.RespondAsync($"submitted video, check https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}", true);
 
             try
             {
@@ -353,15 +340,15 @@ internal class ImageRoyale : ModuleBase
             }
             catch (Exception ex)
             {
-                Logger.Warn("exception pinning image royale message in vote channel!", ex);
+                Logger.Warn("exception pinning video royale message in vote channel!", ex);
             }
         }
         catch (Exception e)
         {
-            Logger.Error("Failed to send image to voting channel", e);
+            Logger.Error("Failed to send video to voting channel", e);
             try
             {
-                await ctx.RespondAsync("failed to send image to voting channel", true);
+                await ctx.RespondAsync("failed to send video to voting channel", true);
             }
             catch { }
             return;

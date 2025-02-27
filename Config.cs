@@ -88,12 +88,14 @@ internal class Config
     public string sanityAffirmative = "Yes";
     public string sanityNegative = "No";
     public string openAiConfessionalModel = "gpt-3.5-turbo";
-    public string openAiConfessionalSystemPrompt = "This is a confession bot in a Discord thread. The bot anonymously posts confessions or whatever people are thinking about. When prompted for a confession, **only** include the confession.";
+    public string openAiConfessionalSystemPrompt = "You're a rewriting/rephrasing buddy. Don't modify the intent or significant content of what you're given, just rewrite it in an anonymizing way.";
     public string openAiConfessionalPrompt = "Confess your sins.";
     public string openAiConfessionalSanityPrompt = "To any text given, respond with \"Yes\", or \"No\", depending on whether or not it is coherent and makes sense to be sent as an anonymous \"confession\" message.";
     public int confessionalCooldownHoursMin = 24;
     public int confessionalCooldownHoursMax = 48;
     public int confessionalAiVotingPeriodHours = 12;
+    public string openAiConfessionRewritePrompt = "You are a rewriting/rephrasing buddy. Do not modify the intent or significant content of what you are given, but simply rewrite it in a way to anonymize the sender.";
+    public string openAiConfessionRewriteModel = "gpt-4o"; // mini sucks ass at rewriting :sob: 
 
     public ulong pollsterAutoWatchForumId = 0;
     public string[] pollsterCategories = Array.Empty<string>();
@@ -103,12 +105,20 @@ internal class Config
     public ulong[] roundRobinBumpIgnoreThreads = Array.Empty<ulong>();
     public string roundRobinBumpMessage = "Bump <:CamobiDog:764589139118784572>";
 
+    [TomlInlineComment("Unicode emoji or emoji id")]
+    public string royaleVoteEmoji = "👍";
+
     public ulong imageRoyaleVotingChannel = 0;
     public ulong imageRoyaleSendChannel = 0;
     public ulong imageRoyaleRole = 0;
     public string imageRoyaleSendTime = "12:00";
-    [TomlInlineComment("Unicode emoji or emoji id")]
-    public string imageRoyaleVoteEmoji = "👍";
+
+    public ulong videoRoyaleVotingChannel = 0;
+    public ulong videoRoyaleVotingRole = 0;
+    public ulong videoRoyaleSendChannel = 0;
+    public ulong videoRoyaleSubmitRole = 0;
+    public string videoRoyaleSendTime = "12:00";
+    public DayOfWeek videoRoyaleSendDay = DayOfWeek.Wednesday;
 
     static Config()
     {

@@ -53,6 +53,7 @@ internal partial class ModuleBase
         }
         catch
         {
+            Logger.Put($"Ignore the above log, {channel} had no message with the ID {id}", LogType.Debug);
             return null;
         }
     }

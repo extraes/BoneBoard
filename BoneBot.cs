@@ -28,6 +28,7 @@ internal partial class BoneBot
     internal Stargrid stargrid;
     internal MessageBuffer msgBuffer;
     internal ImageRoyale imageRoyale;
+    internal VideoRoyale videoRoyale;
 
     internal DiscordClientBuilder clientBuilder;
     internal DiscordClient client;
@@ -105,10 +106,11 @@ internal partial class BoneBot
         stargrid = new(this);
         msgBuffer = new(this);
         imageRoyale = new(this);
+        videoRoyale = new(this);
 
         clientBuilder.UseCommands((isp, ce) =>
         {
-            IEnumerable<Type> commands = new[] { typeof(SlashCommands), typeof(MessageContextActions) }
+            IEnumerable<Type> commands = new[] { typeof(SlashCommands) }
                                             .Concat(ModuleBase.AllModules.Select(m => m.GetType()).Where(t => t.GetCustomAttribute<CommandAttribute>() is not null));
             ce.AddProcessors(scp, mcp);
             ce.AddCommands(commands);

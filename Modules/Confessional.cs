@@ -13,6 +13,7 @@ using Csv;
 using OpenAI.Chat;
 using System.ComponentModel;
 using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus;
 
 namespace BoneBoard.Modules;
 
@@ -20,8 +21,19 @@ namespace BoneBoard.Modules;
 [Command("confess")]
 internal class Confessional : ModuleBase
 {
+    private record RewriteInfo(SlashCommandContext ctx, string originalConfession, string rewrittenConfession, DateTime lastRewrittenAt, DateTime nextRewriteAllowedAt);
+
     static readonly string[] confessionalCsvHeaders = ["WrittenBy", "Timestamp", "Confession", /*"Context"*/];
 
+    const string REWRITE_INTERACTION_FORMAT = "bb.cr.{0}.{1}"; // 0: origin interaction ID -> keyed into info dictionary | 1: action (accept, reject, send original)
+    const string REWRITE_ACCEPT = "a";
+    const string REWRITE_TRYAGAIN = "r";
+    const string REWRITE_SENDORIGINAL = "o";
+
+
+    Dictionary<ulong, RewriteInfo> rewriteInfos = new();
+
+    private static TimeSpan RewriteCooldown => TimeSpan.FromSeconds(10);
     DiscordChannel? _confessionalChannel;
     DiscordChannel? ConfessionalChannel
     {
@@ -46,6 +58,7 @@ internal class Confessional : ModuleBase
     public Confessional(BoneBot bot) : base(bot)
     {
         Config.ConfigChanged += () => _confessionalChannel = null;
+        bot.clientBuilder.ConfigureEventHandlers(x => x.HandleComponentInteractionCreated(DispatchInteractions));
 
         try
         {
@@ -67,7 +80,23 @@ internal class Confessional : ModuleBase
         {
             openAiClient = new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
         }
+    }
 
+    private async Task DispatchInteractions(DiscordClient sender, ComponentInteractionCreatedEventArgs args)
+    {
+        if (string.IsNullOrEmpty(args.Interaction.Data.CustomId))
+            return;
+
+        if (!args.Interaction.Data.CustomId.StartsWith("bb"))
+            return;
+
+        string[] splits = args.Interaction.Data.CustomId.Split('.');
+        switch (splits[1])
+        {
+            case "cr":
+                await HandleRewriteInteraction(args.Interaction, args.Message, splits);
+                break;
+        }
     }
 
     protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
@@ -154,7 +183,7 @@ internal class Confessional : ModuleBase
         var sanityClient = openAiClient.GetChatClient(Config.values.openAiSanityModel);
         ChatCompletionOptions mainOptions = new()
         {
-            MaxTokens = 256,
+            MaxOutputTokenCount = 256,
             Temperature = 0.5f,
         };
 
@@ -169,7 +198,7 @@ internal class Confessional : ModuleBase
             };
             var mainRes = await mainClient.CompleteChatAsync(mainPrompt, mainOptions);
 
-            chatResponse = mainRes.Value.ToString();
+            chatResponse = mainRes.Value.Content[0].Text;
             if (string.IsNullOrEmpty(chatResponse))
                 continue;
 
@@ -183,7 +212,7 @@ internal class Confessional : ModuleBase
             };
 
             var sanityRes = await sanityClient.CompleteChatAsync(altPrompt);
-            string sanityResponse = sanityRes.Value.ToString();
+            string sanityResponse = sanityRes.Value.Content[0].Text;
             Logger.Put($"Got AI sanitychecker response for round {i + 1} - {sanityResponse}");
 
 
@@ -378,7 +407,7 @@ internal class Confessional : ModuleBase
 
         PersistentData.values.confessionalRevealTime.Remove(msg.Id);
 
-        bool isAi = confessionsByAi.Contains(msg);
+        bool isAi = PersistentData.values.aiConfessionals.Contains(msg.Id);
 
         try
         {
@@ -416,12 +445,20 @@ internal class Confessional : ModuleBase
     [Description("confess your sins my child")]
     public static async Task SendConfessional(
         SlashCommandContext ctx,
-        [Parameter("message")] string text
+        [Parameter("message")] string text,
+        [Parameter("rewrite"), Description("Have an LLM to rewrite your confession (with your confirmation), so it's less identifiable as you")] bool rewriteAi = false
+        //[Parameter("delay"), Description("")] double delaySend = 0.0 DONT ADD THIS, it makes tracking cooldowns harder!!!! (as in, there are more design decisions to be made and i dont wanna)
        )
     {
         if (ctx.Member is null)
         {
             await ctx.RespondAsync("😂👎", true);
+            return;
+        }
+
+        if (rewriteAi)
+        {
+            await BeginConfessionalRewriting(ctx, text);
             return;
         }
 
@@ -434,6 +471,124 @@ internal class Confessional : ModuleBase
         }
 
         await ctx.RespondAsync("Confessed successfully. May the holy spirit cleanse you of your sins.", true);
+    }
+
+    private static async Task BeginConfessionalRewriting(SlashCommandContext ctx, string confessionToRewrite)
+    {
+        Confessional confessional = BoneBot.Bots[ctx.Client].confessions;
+        DiscordMember member = ctx.Member!;
+
+        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.ROLE))
+        {
+            if (member.Roles.All(r => r.Id != Config.values.confessionalRole))
+            {
+                await ctx.FollowupAsync("You don't have the required role to confess, so your confession can't be rewritten.", true);
+                return;
+            }
+        }
+
+        if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
+        {
+            if (confessional.confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+            {
+                await ctx.FollowupAsync("You've already confessed in the last 6 hours, so your confession can't be rewritten.", true);
+                return;
+            }
+        }
+        
+        if (confessional.openAiClient is null)
+        {
+            await ctx.FollowupAsync("AI rewriting is currently unavailable, so your confession can't be rewritten.", true);
+            return;
+        }
+
+        await ctx.RespondAsync("Rewriting your confession...", true);
+        await RewriteConfession(ctx, confessionToRewrite, confessional);
+    }
+
+    private static async Task RewriteConfession(SlashCommandContext ctx, string confessionToRewrite, Confessional confessional)
+    {
+        ChatClient clint = confessional.openAiClient!.GetChatClient(Config.values.openAiConfessionRewriteModel);
+        BoneBot.Bots[ctx.Client].confessions.rewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, "I'm impatient and can't wait for an LLM to crunch its numbers!", DateTime.Now, DateTime.Now + TimeSpan.FromDays(1));
+
+        string rewritten;
+        try
+        {
+            var res = await clint.CompleteChatAsync(
+            [
+                new SystemChatMessage(Config.values.openAiConfessionRewritePrompt),
+                new UserChatMessage(confessionToRewrite)
+            ], new ChatCompletionOptions() { MaxOutputTokenCount = 256 });
+            rewritten = res.Value.Content[res.Value.Content.Count - 1].Text;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Exception while trying to rewrite a confession! ", ex);
+            await ctx.EditResponseAsync("An error occurred while trying to rewrite your confession. Please try again.");
+            return;
+        }
+
+        DateTime nextRewriteAllowedAt = DateTime.Now + RewriteCooldown + TimeSpan.FromMilliseconds(confessionToRewrite.Length * 2 + rewritten.Length * 4);
+        confessional.rewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, rewritten, DateTime.Now, nextRewriteAllowedAt);
+
+        DiscordButtonComponent accept = new(DiscordButtonStyle.Primary, string.Format(REWRITE_INTERACTION_FORMAT, ctx.Interaction.Id, REWRITE_ACCEPT), "Accept");
+        DiscordButtonComponent tryagain = new(DiscordButtonStyle.Secondary, string.Format(REWRITE_INTERACTION_FORMAT, ctx.Interaction.Id, REWRITE_TRYAGAIN), "Rewrite again");
+        DiscordButtonComponent sendOriginal = new(DiscordButtonStyle.Secondary, string.Format(REWRITE_INTERACTION_FORMAT, ctx.Interaction.Id, REWRITE_SENDORIGINAL), "Send original");
+        string originalDisplay = Logger.EnsureShorterThan(confessionToRewrite.Replace("\n", " // ").Replace('`', '\''), 700);
+        string rewrittenDisplay = Logger.EnsureShorterThan(rewritten.Replace("\n", " // ").Replace('`', '\''), 800);
+        var dmb = new DiscordMessageBuilder().WithContent($"Rewrote: `{originalDisplay}`\nInto: `{rewrittenDisplay}`\nNext rewrite allowed {Formatter.Timestamp(nextRewriteAllowedAt, TimestampFormat.RelativeTime)}" +
+            $"{(rewritten.Contains('\n') ? "\n-# Line breaks have been replaced with \" // \" here for the sake of visibility. They will appear normally if this rewrite is chosen." : "")}" +
+            $"{(rewritten.Contains('`') ? "\n-# Backticks have been replaced with single quotes (`'`) here for the sake of formatting. They will appear normally if this rewrite is chosen." : "")}")
+            .AddComponents(accept, tryagain, sendOriginal);
+
+        await ctx.EditResponseAsync(dmb);
+    }
+
+    private async Task HandleRewriteInteraction(DiscordInteraction interaction, DiscordMessage message, string[] splits)
+    {
+        var res = new DiscordInteractionResponseBuilder().AsEphemeral(true);
+        if (!ulong.TryParse(splits[2], out ulong originInteractionId))
+        {
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent($"Unable to parse `{splits[2]}` into an interaction ID."));
+            return;
+        }
+
+        if (!rewriteInfos.TryGetValue(originInteractionId, out RewriteInfo? info))
+        {
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent($"Unable to find `{splits[2]}` in the interaction info dictionary."));
+            return;
+        }
+
+        if (interaction.User != info.ctx.User)
+        {
+            await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent($"You're not the originator of this interaction."));
+            return;
+        }
+
+        switch (splits[3])
+        {
+            case REWRITE_ACCEPT:
+                await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent("👍"));
+                var response = await SendConfessional(info.ctx.Member!, info.rewrittenConfession);
+                await info.ctx.EditResponseAsync(response is not null ? "Sent!" : "It seems there was an issue sending your confession. Consider telling the bot operator to check the log.");
+                break;
+            case REWRITE_TRYAGAIN:
+                if (info.nextRewriteAllowedAt > DateTime.Now)
+                {
+                    await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent($"You can't request a rewrite again yet. Try again {Formatter.Timestamp(info.nextRewriteAllowedAt, TimestampFormat.RelativeTime)}"));
+                    return;
+                }
+
+                await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent("👍"));
+                await info.ctx.EditResponseAsync("Rewriting your confession...");
+                await RewriteConfession(info.ctx, info.originalConfession, this);
+                break;
+            case REWRITE_SENDORIGINAL:
+                await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent("👍"));
+                var responseOriginal = await SendConfessional(info.ctx.Member!, info.originalConfession);
+                await info.ctx.EditResponseAsync(responseOriginal is not null ? "Sent!" : "It seems there was an issue sending your confession. Consider telling the bot operator to check the log.");
+                break;
+        }
     }
 
     [Command("sendAiConfession"), Description("Sends an AI confession.")]

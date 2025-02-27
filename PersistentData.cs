@@ -24,7 +24,7 @@ internal class PersistentData
     public Dictionary<ulong, ulong> bufferChannelMessages = new(); // channel id -> message id
     public Dictionary<ulong, string> bufferChannelMessageFormats = new(); // channel id -> message format string
     public Dictionary<ulong, ulong> imageRoyaleSubmissions = new(); // submitter id -> message id
-    public Dictionary<ulong, ulong> imageRoyaleVotes = new(); // user id -> message id
+    public Dictionary<ulong, ulong> videoRoyaleSubmissions = new(); // submitter id -> message id
     public List<ulong> aiConfessionals = new(); // message id
     public Dictionary<ulong, DateTime> confessionalRevealTime = new(); // message id -> reveal datetime
     public ulong lastFrogKing;
@@ -59,13 +59,12 @@ internal class PersistentData
     {
         string configText = File.ReadAllText(PD_PATH);
         values = JsonConvert.DeserializeObject<PersistentData>(configText) ?? new PersistentData();
-        Logger.Put($"Read {values.frogRoleTimes.Count} frog role times from disk.", LogType.Debug);
-
+        Logger.Put($"Read persistent data from disk.", LogType.Debug);
     }
 
     public static void WritePersistentData()
     {
-        Logger.Put($"Writing {values.frogRoleTimes.Count} frog role times to disk.", LogType.Debug);
+        Logger.Put($"Writing persistent data to disk.", LogType.Debug);
         File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(values));
         PersistentDataChanged?.Invoke();
     }
