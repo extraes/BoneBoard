@@ -145,6 +145,8 @@ internal class ImageRoyale : ModuleBase
 
             if (topMessage is null)
             {
+                PersistentData.values.imageRoyaleSubmissions.Clear();
+                PersistentData.WritePersistentData();
                 Logger.Warn("No top message found for image royale");
                 return;
             }
