@@ -33,6 +33,7 @@ internal class ImageRoyale : ModuleBase
 
     Timer? sendTimer;
     TimeOnly sendTime;
+    DateTime lastSend;
     DiscordChannel? voteChannel;
     DiscordChannel? outputChannel;
     DiscordEmoji? voteEmoji;
@@ -96,6 +97,15 @@ internal class ImageRoyale : ModuleBase
 
     private async void SendTopImage(object? state)
     {
+        if (lastSend > DateTime.Now - TimeSpan.FromMinutes(1))
+        {
+            Logger.Warn("Image Royale send timer triggered too soon, ignoring");
+            Logger.Warn("Callstack: " + Environment.StackTrace);
+            sendTimer?.Change(TimeSpan.FromDays(1), TimeSpan.FromDays(1));
+            return;
+        }
+        lastSend = DateTime.Now;
+
         // locally declared because .NET GC can handle it and i want to be able to modify these with hot code replace :^)
         string[] possibleMessageStrings = GetRoyaleStrings();
 
