@@ -49,7 +49,11 @@ internal class ImageRoyale : ModuleBase
 
             DateTime now = DateTime.Now;
             DateTime next = new(now.Year, now.Month, sendTime.ToTimeSpan() < now.TimeOfDay ? now.Day + 1 : now.Day, sendTime.Hour, sendTime.Minute, sendTime.Second);
-            sendTimer ??= new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
+            if (sendTimer is null)
+            {
+                Logger.Warn("Creating new ImageRoyale timer, heres the callstack: " + Environment.StackTrace);
+                sendTimer = new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
+            }
             sendTimer.Change(next - now, TimeSpan.FromDays(1));
 
             Logger.Put($"Waiting {next - now} to send imageroyale", LogType.Debug);
@@ -105,6 +109,7 @@ internal class ImageRoyale : ModuleBase
             return;
         }
         lastSend = DateTime.Now;
+        Logger.Warn("Currently sending ImageRoyale, heres the callstack: " + Environment.StackTrace);
 
         // locally declared because .NET GC can handle it and i want to be able to modify these with hot code replace :^)
         string[] possibleMessageStrings = GetRoyaleStrings();
