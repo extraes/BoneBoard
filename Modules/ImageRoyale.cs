@@ -31,7 +31,7 @@ internal class ImageRoyale : ModuleBase
         }
     }
 
-    Timer? sendTimer;
+    static Timer? sendTimer;
     TimeOnly sendTime;
     DateTime lastSend;
     DiscordChannel? voteChannel;

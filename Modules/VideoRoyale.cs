@@ -31,7 +31,7 @@ internal class VideoRoyale : ModuleBase
         }
     }
 
-    Timer sendTimer;
+    static Timer sendTimer;
     TimeOnly sendTime;
     DateTime lastSend;
     DiscordChannel? voteChannel;
