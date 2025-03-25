@@ -134,7 +134,8 @@ internal class VideoRoyale : ModuleBase
             int topVotes = 0;
             DiscordMessage? topMessage = null;
 
-            foreach (ulong messageId in PersistentData.values.videoRoyaleSubmissions.Values)
+            // ensures more recent submissions are processed later
+            foreach (ulong messageId in PersistentData.values.videoRoyaleSubmissions.Values.OrderBy(id => id))
             {
                 DiscordMessage? msg = await TryFetchMessage(voteChannel, messageId, true);
                 if (msg is null)
@@ -144,7 +145,8 @@ internal class VideoRoyale : ModuleBase
                 }
                 int voteCount = await GetReactionsThatCount(msg);
 
-                if (voteCount > topVotes)
+                // if a more recent submission got the same number of votes, make it the frontrunner instead
+                if (voteCount >= topVotes)
                 {
                     topVotes = voteCount;
                     topMessage = msg;
