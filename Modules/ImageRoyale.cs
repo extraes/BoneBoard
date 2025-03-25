@@ -131,7 +131,8 @@ internal class ImageRoyale : ModuleBase
             int topVotes = 0;
             DiscordMessage? topMessage = null;
 
-            foreach (ulong messageId in PersistentData.values.imageRoyaleSubmissions.Values)
+            // Order by submission order, so that the most recent submissions are last
+            foreach (ulong messageId in PersistentData.values.imageRoyaleSubmissions.Values.OrderBy(id => id))
             {
                 DiscordMessage? msg = await TryFetchMessage(voteChannel, messageId, true);
                 if (msg is null)
@@ -141,7 +142,8 @@ internal class ImageRoyale : ModuleBase
                 }
                 int voteCount = await GetReactionsThatCount(msg);
 
-                if (voteCount > topVotes)
+                // ensures that if a message recieves the same number of votes, it still wins if it was more recently posted
+                if (voteCount >= topVotes) 
                 {
                     topVotes = voteCount;
                     topMessage = msg;
@@ -221,6 +223,14 @@ internal class ImageRoyale : ModuleBase
             "As previously stated,",
             "I hope this email finds you well,",
             "chat is this real",
+            "i got an email from someone i dont know, and it had this in it... at least it wasnt a screamer",
+            "As per my previous correspondance,",
+            "so why dont *i* have slowmode?",
+            "wtf is this shit bro",
+            "ts is frying me 😭😭😭😭💔💔",
+            "ts pmo icl",
+            "google 'jerry seinfeld 17 38' to learn about his collab with fetty wap",
+            "EXPLODING YOU WITH MY MIND 💥💥💥",
         ];
     }
 
