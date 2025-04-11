@@ -21,7 +21,7 @@ internal class ImageRoyale : ModuleBase
 {
     public ImageRoyale(BoneBot bot) : base(bot) { }
 
-    [ThreadStatic] static HttpClient _clint;
+    [ThreadStatic] static HttpClient? _clint;
     static HttpClient Clint
     {
         get

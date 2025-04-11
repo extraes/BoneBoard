@@ -21,7 +21,7 @@ internal class VideoRoyale : ModuleBase
 {
     public VideoRoyale(BoneBot bot) : base(bot) { }
 
-    [ThreadStatic] static HttpClient _clint;
+    [ThreadStatic] static HttpClient? _clint;
     static HttpClient Clint
     {
         get
@@ -31,7 +31,7 @@ internal class VideoRoyale : ModuleBase
         }
     }
 
-    static Timer sendTimer;
+    static Timer? sendTimer;
     TimeOnly sendTime;
     DateTime lastSend;
     DiscordChannel? voteChannel;
