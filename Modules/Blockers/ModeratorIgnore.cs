@@ -101,6 +101,7 @@ internal class ModeratorIgnore : ModuleBase
         if (ignoreCounts.ContainsKey(member) && !overwrite)
         {
             await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
+            return;
         }
 
         TimeSpan addedTime = unit switch
@@ -141,6 +142,7 @@ internal class ModeratorIgnore : ModuleBase
         if (ignoreCounts.ContainsKey(member) && !overwrite)
         {
             await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
+            return;
         }
 
         IgnoreData newData = new()
