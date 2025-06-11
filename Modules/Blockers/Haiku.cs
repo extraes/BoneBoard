@@ -1,10 +1,14 @@
-﻿using DSharpPlus.Entities;
+﻿using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Responses;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,7 +23,7 @@ internal class Haiku : ModuleBase
     }
     
     OpenAIClient? openAiClient;
-    Dictionary<ulong, string> reasoningTraces = new Dictionary<ulong, string>();
+    static Dictionary<ulong, string> reasoningTraces = new Dictionary<ulong, string>();
 
     protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
@@ -90,7 +94,7 @@ internal class Haiku : ModuleBase
         {
             if (outItem is ReasoningResponseItem reasoning)
             {
-                reasoningTrace += string.Join('\n', reasoning.SummaryTextParts);
+                reasoningTrace += "\n" + string.Join('\n', reasoning.SummaryTextParts);
             }
             else if (outItem is MessageResponseItem llmMessage)
             {
@@ -151,5 +155,42 @@ internal class Haiku : ModuleBase
 
         // if we got here, the message is a haiku
         return false;
+    }
+
+    [Command("latestReasonings"), Description("Gets latest reasonings fragments")]
+    [RequireApplicationOwner]
+    public static async Task LatestReasonings(SlashCommandContext ctx)
+    {
+        if (reasoningTraces.Count == 0)
+        {
+            await ctx.RespondAsync("No reasoning traces found.", true);
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        foreach (KeyValuePair<ulong, string> kvp in reasoningTraces.OrderByDescending(kvp => kvp.Key))
+        {
+            string line = $"# Message {kvp.Key}\n{kvp.Value}";
+            sb.AppendLine(line);
+        }
+        await ctx.RespondAsync(sb.ToString(), true);
+    }
+
+    [Command("getReasoning")]
+    [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public static async Task GetReasoning(SlashCommandContext ctx, DiscordMessage msg)
+    {
+        await ctx.DeferResponseAsync(true);
+
+
+        if (!reasoningTraces.TryGetValue(msg.Id, out string? reasoningTrace))
+        {
+            await ctx.FollowupAsync("No reasoning trace found for this message.", true);
+            return;
+        }
+
+
+        await ctx.FollowupAsync($"Reasoning trace for message {msg.Id}:\n{reasoningTrace}", true);
     }
 }
