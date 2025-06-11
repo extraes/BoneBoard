@@ -71,10 +71,7 @@ internal class Haiku : ModuleBase
 
         var options = new ResponseCreationOptions()
         {
-            ReasoningOptions = new(ResponseReasoningEffortLevel.Low) // rent due
-            {
-                ReasoningSummaryVerbosity = ResponseReasoningSummaryVerbosity.Concise 
-            }, 
+            ReasoningOptions = new(ResponseReasoningEffortLevel.Low), // rent due
             Instructions = Config.values.haikuSystemPrompt,
         };
         var response = await clint.CreateResponseAsync(msg.Content, options);
