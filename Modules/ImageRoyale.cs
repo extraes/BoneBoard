@@ -273,7 +273,8 @@ internal class ImageRoyale : ModuleBase
     //}
 
     [Command("sendnow"), Description("Force-sends the top image immediately")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task SendNow(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))

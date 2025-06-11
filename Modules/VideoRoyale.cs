@@ -245,7 +245,8 @@ internal class VideoRoyale : ModuleBase
     //}
 
     [Command("sendnow"), Description("Force-sends the top video immediately")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task SendNow(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))

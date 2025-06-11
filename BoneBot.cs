@@ -22,7 +22,6 @@ internal partial class BoneBot
     internal ModuleBase[] blockers;
     internal Casino casino;
     internal Hangman hangman;
-    internal Pollster pollster;
     internal FrogRole frogRole;
     internal Confessional confessions;
     internal Stargrid stargrid;
@@ -50,22 +49,6 @@ internal partial class BoneBot
             allChannelsReceived += value;
         }
         remove { allChannelsReceived -= value; }
-    }
-
-    public static async void TryRestoreConnections()
-    {
-        foreach (var client in Bots.Keys)
-        {
-            try
-            {
-                await client.ReconnectAsync();
-                Logger.Put("Reconnected on " + client.CurrentUser);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Exception while trying to restore connection! " + ex);
-            }
-        }
     }
 
     public BoneBot(string token)
@@ -97,10 +80,10 @@ internal partial class BoneBot
             new WordPercentage(this),
             new NoVowels(this),
             new SheOnMyTill(this),
+            new Haiku(this),
         ];
         casino = new(this);
         hangman = new(this);
-        pollster = new(this);
         frogRole = new(this);
         confessions = new(this);
         stargrid = new(this);
@@ -120,12 +103,6 @@ internal partial class BoneBot
             RegisterDefaultCommandProcessors = false,
             UseDefaultCommandErrorHandler = false, // annoying fuck
         });
-        //clientBuilder.ConfigureServices(x => x.AddSingleton(casino)
-        //                                      .AddSingleton(hangman)
-        //                                      .AddSingleton(pollster)
-        //                                      .AddSingleton(frogRole)
-        //                                      .AddSingleton(confessions)
-        //                                      .AddSingleton(stargrid));
 
         client = clientBuilder.Build();
 
@@ -249,7 +226,7 @@ internal partial class BoneBot
         if (args.Message.Author is null || Config.values.blockedUsers.Contains(args.Message.Author.Id))
             return;
         DiscordMember? member = args.Author as DiscordMember;
-        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermissions.ManageMessages);
+        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermission.ManageMessages);
 
         if (Config.values.channelsWhereUsersAreProhibitedFromMedia.TryGetValue(args.Channel.Id.ToString(), out ulong[]? mediaUserIds) && mediaUserIds.Contains(args.Author.Id))
         {
@@ -276,7 +253,7 @@ internal partial class BoneBot
         if (args.Author?.IsBot ?? true)
             return;
         DiscordMember? member = args.Author as DiscordMember;
-        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermissions.ManageMessages);
+        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermission.ManageMessages);
 
         if (!hasManageMessages && Config.values.channelsWhereNoVowelsAreAllowed.Contains(args.Channel.Id) && args.Message.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase)))
         {

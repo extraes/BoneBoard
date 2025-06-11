@@ -267,7 +267,8 @@ internal partial class Hangman : ModuleBase
     }
 
     [Command("createMsg"), Description("Creates the message that will be used for hangman. \\n will be replaced w newline")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task CreateHangmanMsg(SlashCommandContext ctx,
         [Parameter("msgContent"), Description("{0} -> word, {1} -> hangman, {2} -> guesses")] string content = "")
     {
@@ -289,7 +290,8 @@ internal partial class Hangman : ModuleBase
     }
 
     [Command("start"), Description("Starts a new hangman game!")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task StartHangman(SlashCommandContext ctx,
         [Parameter("word"), Description("Force the word to be one of your choosing")] string word = "")
     {

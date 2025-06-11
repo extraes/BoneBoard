@@ -57,7 +57,7 @@ internal class Confessional : ModuleBase
 
     public Confessional(BoneBot bot) : base(bot)
     {
-        Config.ConfigChanged += () => _confessionalChannel = null;
+        Config.ConfigChanged += () => { _confessionalChannel = null; openAiClient = null; };
         bot.clientBuilder.ConfigureEventHandlers(x => x.HandleComponentInteractionCreated(DispatchInteractions));
 
         try
@@ -75,11 +75,6 @@ internal class Confessional : ModuleBase
         }
         catch { }
 
-
-        if (!string.IsNullOrEmpty(Config.values.openAiToken))
-        {
-            openAiClient = new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
-        }
     }
 
     private async Task DispatchInteractions(DiscordClient sender, ComponentInteractionCreatedEventArgs args)
@@ -165,8 +160,16 @@ internal class Confessional : ModuleBase
             return;
         }
 
+
+
+
         if (openAiClient is null)
-            return;
+        {
+            if (string.IsNullOrEmpty(Config.values.openAiToken))
+                return;
+            else
+                openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
+        }
 
         string mainModel = Config.values.openAiConfessionalModel;
         string mainSysPrompt = Config.values.openAiConfessionalSystemPrompt;
@@ -539,7 +542,7 @@ internal class Confessional : ModuleBase
         var dmb = new DiscordMessageBuilder().WithContent($"Rewrote: `{originalDisplay}`\nInto: `{rewrittenDisplay}`\nNext rewrite allowed {Formatter.Timestamp(nextRewriteAllowedAt, TimestampFormat.RelativeTime)}" +
             $"{(rewritten.Contains('\n') ? "\n-# Line breaks have been replaced with \" // \" here for the sake of visibility. They will appear normally if this rewrite is chosen." : "")}" +
             $"{(rewritten.Contains('`') ? "\n-# Backticks have been replaced with single quotes (`'`) here for the sake of formatting. They will appear normally if this rewrite is chosen." : "")}")
-            .AddComponents(accept, tryagain, sendOriginal);
+            .AddActionRowComponent(accept, tryagain, sendOriginal);
 
         await ctx.EditResponseAsync(dmb);
     }
@@ -592,7 +595,8 @@ internal class Confessional : ModuleBase
     }
 
     [Command("sendAiConfession"), Description("Sends an AI confession.")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task TestSendAiConfession(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))
@@ -607,9 +611,9 @@ internal class Confessional : ModuleBase
     }
 
     [Command("reveal")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
-    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
     public static async Task CheckWasFromAi(SlashCommandContext ctx, DiscordMessage msg)
     {
         if (await SlashCommands.ModGuard(ctx))

@@ -16,7 +16,7 @@ namespace BoneBoard;
 [Command("star")]
 internal class SlashCommands
 {
-    public const DiscordPermissions MODERATOR_PERMS = DiscordPermissions.ManageRoles | DiscordPermissions.ManageMessages;
+    public static readonly DiscordPermissions ModeratorPerms = new DiscordPermissions(DiscordPermission.ManageRoles, DiscordPermission.ManageMessages);
 
     public static async Task<bool> ModGuard(SlashCommandContext ctx, bool ownerOnly = false)
     {
@@ -26,7 +26,7 @@ internal class SlashCommands
             return true;
         }
 
-        if (!ctx.Member.Permissions.HasPermission(MODERATOR_PERMS))
+        if (!ctx.Member.Permissions.HasAllPermissions(ModeratorPerms))
         {
             await ctx.RespondAsync("nuh uh", true);
             return true;
@@ -43,7 +43,7 @@ internal class SlashCommands
 
     [Command("reloadCfg")]
     [Description("Reloads the config. This may not have any impact on things that are cached at startup.")]
-    [RequirePermissions(DiscordPermissions.AddReactions | DiscordPermissions.ManageMessages, MODERATOR_PERMS)]
+    [RequireApplicationOwner]
     public static async Task ReloadConfig(
         SlashCommandContext ctx
        )
@@ -58,7 +58,8 @@ internal class SlashCommands
 
 
     [Command("setBufferedChannel"), Description("Toggle whether this channel is un/buffered")]
-    [RequirePermissions(DiscordPermissions.None, MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task SetBufferedChannel(
         SlashCommandContext ctx,
         [Parameter("add"), Description("True to add, false to remove.")] bool add,
@@ -107,7 +108,8 @@ internal class SlashCommands
     }
 
     [Command("startUnbufferTimer"), Description("Starts the timer to un-buffer messages sent during buffer-time")]
-    [RequirePermissions(DiscordPermissions.None, MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task StartUnbufferTimer(SlashCommandContext ctx)
     {
         if (await ModGuard(ctx))
@@ -137,7 +139,8 @@ internal class SlashCommands
 
 
     [Command("flushBufferedMessages"), Description("Immediately flushes buffered messages. Doesn't stop the timer.")]
-    [RequirePermissions(DiscordPermissions.None, MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task FlushBufferedMessages(SlashCommandContext ctx)
     {
         if (await ModGuard(ctx))

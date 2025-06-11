@@ -80,6 +80,10 @@ internal class Config
     public ulong[] channelsWhereMessagesMustConformToFormat = Array.Empty<ulong>();
     public string[] theFormatInQuestion = [ "she", "on my", "till i" ];
 
+    public ulong[] channelsWhereMessagesMustBeHaikus = Array.Empty<ulong>();
+    public string haikuAiModel = "o4-mini"; // non-reasoning models suck dick at counting syllables, lol -- this may get expensive for moderators but oh well, i guess ill find out huh
+    public string haikuSystemPrompt = "For each line of input, count the number of syllables and output that number on a new line.";
+
     public string confessionCsvPath = "./confessions.csv";
     public string aiConfessionIsBotEmoji = "🤖";
     public string aiConfessionIsHumanEmoji = "👤";

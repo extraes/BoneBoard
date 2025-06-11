@@ -383,7 +383,8 @@ internal class FrogRole : ModuleBase
 
     [Command("createFrogMsg")]
     [Description("Creates the message that must be reacted to for KOTF (King of the Frog)")]
-    [RequirePermissions(DiscordPermissions.AddReactions | DiscordPermissions.ManageMessages, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task CreateFrogMessage(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
@@ -409,7 +410,8 @@ internal class FrogRole : ModuleBase
 
     [Command("setFrogUnavailableText")]
     [Description("Set the text that will be displayed when someone tries to get the frog role when it's not available.")]
-    [RequirePermissions(DiscordPermissions.AddReactions | DiscordPermissions.ManageMessages, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task SetFrogUnavailableText(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
@@ -428,7 +430,8 @@ internal class FrogRole : ModuleBase
 
     [Command("createFrogLeaderboardMsg")]
     [Description("Creates the message that must be reacted to for KOTF (King of the Frog)")]
-    [RequirePermissions(DiscordPermissions.AddReactions | DiscordPermissions.ManageMessages, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task CreateFrogLeaderboardMsg(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
@@ -452,7 +455,8 @@ internal class FrogRole : ModuleBase
 
     [Command("removeUserFromLeaderboard")]
     [Description("Remove user from frog role leaderboard. De-role/block/ban them before use.")]
-    [RequirePermissions(DiscordPermissions.AddReactions | DiscordPermissions.ManageMessages, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task RemoveUserFromLeaderboard(
         SlashCommandContext ctx,
         [Parameter("user")]

@@ -82,7 +82,7 @@ internal class ModeratorIgnore : ModuleBase
     }
 
     [Command("forTime"), Description("Ignores you/someone else for a given length of time")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireApplicationOwner]
     public static async Task IgnoreFor(SlashCommandContext ctx, int count, TimeUnit unit, DiscordMember? member = null, bool overwrite = false)
     {
         member ??= ctx.Member;
@@ -121,7 +121,8 @@ internal class ModeratorIgnore : ModuleBase
     }
 
     [Command("forCount"), Description("Ignores you/someone else for a given number of events")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task IgnoreFor(SlashCommandContext ctx, int count, DiscordMember? member = null, bool overwrite = false)
     {
         member ??= ctx.Member;
@@ -152,7 +153,8 @@ internal class ModeratorIgnore : ModuleBase
     }
 
     [Command("profilington"), Description("Check how long this shitass code has executed!")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task DumpTimes(SlashCommandContext ctx)
     {
         await ctx.RespondAsync($"GetUser has executed {eventsProcessed} time(s) and wasted {timeWasted.Elapsed.TotalSeconds} seconds of CPU time!", true);

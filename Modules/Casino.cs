@@ -264,7 +264,7 @@ internal class Casino : ModuleBase
         List<Cards.Card> playerHand = new();
         string display = GenerateBlackjackString(wager, dealerHand, playerHand);
         var builder = new DiscordWebhookBuilder()
-            .AddComponents(hitButtonGrayed, stayButtonGrayed);
+            .AddActionRowComponent(hitButtonGrayed, stayButtonGrayed);
 
         // yes i know local functions are bad. i dont care.
         async Task UpdateDisplay()
@@ -298,7 +298,7 @@ internal class Casino : ModuleBase
         var stayButton = new DiscordButtonComponent(DiscordButtonStyle.Primary, standId, "Stay", false);
 
         builder.ClearComponents();
-        builder.AddComponents(hitButton, stayButton);
+        builder.AddActionRowComponent(hitButton, stayButton);
         await UpdateDisplay();
     }
 
@@ -397,6 +397,7 @@ internal class Casino : ModuleBase
             new DiscordButtonComponent(DiscordButtonStyle.Danger, BLACKJACK_NO_OP + ".a", "Hit", true),
             new DiscordButtonComponent(DiscordButtonStyle.Primary, BLACKJACK_NO_OP + ".b", "Stay", true),
         };
+        DiscordActionRowComponent disabledDarc = new(disabledButtons);
 
         Cards.Deck deck = new();
         deck.Exclude(dealerHand);
@@ -429,7 +430,8 @@ internal class Casino : ModuleBase
                 {
                     // lose
                     PersistentData.WritePersistentData();
-                    builder.AddComponents(disabledButtons);
+                    
+                    builder.AddActionRowComponent(disabledDarc);
                     await Respond(builder.WithContent(builder.Content + $"\nYou lost your {wager} points! You now have {PersistentData.values.casinoPoints[interaction.User.Id]} points!"));
                     return;
                 }
@@ -448,7 +450,7 @@ internal class Casino : ModuleBase
                 var hitButton = new DiscordButtonComponent(DiscordButtonStyle.Danger, hitId, "Hit", false);
                 var stayButton = new DiscordButtonComponent(DiscordButtonStyle.Primary, standId, "Stay", false);
 
-                builder.AddComponents(hitButton, stayButton);
+                builder.AddActionRowComponent(hitButton, stayButton);
 
                 await UpdateDisplay();
                 break;
@@ -465,7 +467,7 @@ internal class Casino : ModuleBase
 
 
                 builder.ClearComponents();
-                builder.AddComponents(disabledButtons);
+                builder.AddActionRowComponent(disabledDarc);
 
                 int playerValStand = Cards.HandValue(playerHand);
                 int dealerValStand = Cards.HandValue(dealerHand);
@@ -568,7 +570,8 @@ internal class Casino : ModuleBase
     }
 
     [Command("givePoints"), Description("Give a user points")]
-    [RequirePermissions(DiscordPermissions.None, SlashCommands.MODERATOR_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task GivePoints(SlashCommandContext ctx,
         [Parameter("amount"), Description("How many points to give.")] int amount,
         [Parameter("sendTo"), Description("Who to give points to.")] DiscordMember user)

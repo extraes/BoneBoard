@@ -20,7 +20,7 @@ namespace BoneBoard.Modules;
 [Command("stargrid")]
 internal class Stargrid : ModuleBase
 {
-    const DiscordPermissions FORCE_QUOTE_PERMS = DiscordPermissions.ManageRoles | DiscordPermissions.ManageMessages;
+    static readonly DiscordPermissions ForceQuotePerms = new DiscordPermissions(DiscordPermission.ManageRoles, DiscordPermission.ManageMessages);
 
     DiscordChannel? outputChannel;
     public Stargrid(BoneBot bot) : base(bot)
@@ -208,8 +208,8 @@ internal class Stargrid : ModuleBase
     }
 
     [Command("manualQuote")]
-    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
-    [RequirePermissions(DiscordPermissions.None, DiscordPermissions.ModerateMembers)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ModerateMembers])]
     public static async Task ForceQuoteSilent(SlashCommandContext ctx,
         string quote,
         int year,
@@ -302,14 +302,14 @@ internal class Stargrid : ModuleBase
 
     [Command("forceQuoteNoRxn")]
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
-    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
-    [RequirePermissions(DiscordPermissions.None, FORCE_QUOTE_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
     {
         if (await SlashCommands.ModGuard(ctx, false))
             return;
 
-        if (ctx.Member is null || !ctx.Member.Permissions.HasPermission(FORCE_QUOTE_PERMS))
+        if (ctx.Member is null || !ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
         {
             await ctx.RespondAsync("nuh uh", true);
             return;
@@ -333,8 +333,8 @@ internal class Stargrid : ModuleBase
 
     [Command("forceQuote")]
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
-    [DirectMessageUsage(DirectMessageUsage.DenyDMs)]
-    [RequirePermissions(DiscordPermissions.AddReactions, FORCE_QUOTE_PERMS)]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
     {
         if (await SlashCommands.ModGuard(ctx, false))
@@ -346,7 +346,7 @@ internal class Stargrid : ModuleBase
             return;
         }
 
-        if (!ctx.Member.Permissions.HasPermission(FORCE_QUOTE_PERMS))
+        if (!ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
         {
             await ctx.RespondAsync("nuh uh", true);
             return;
