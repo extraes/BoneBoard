@@ -80,7 +80,7 @@ internal class Haiku : ModuleBase
         {
             ReasoningOptions = new(ResponseReasoningEffortLevel.Medium) // I've seen a case of low-effort reasoning straight *forgetting* a word when counting, like bro
             {
-                ReasoningSummaryVerbosity =  ResponseReasoningSummaryVerbosity.Detailed
+                //ReasoningSummaryVerbosity =  ResponseReasoningSummaryVerbosity.Detailed
             }, 
             Instructions = Config.values.haikuSystemPrompt,
         };
@@ -93,6 +93,8 @@ internal class Haiku : ModuleBase
 
             return false;
         }
+
+        Logger.Put("Raw pipeline response: " + response.GetRawResponse().Content.ToString(), LogType.Debug);
 
         string reasoningTrace = "";
         int[] llmSyllableCounts = [];
