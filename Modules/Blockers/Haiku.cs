@@ -78,7 +78,10 @@ internal class Haiku : ModuleBase
 
         var options = new ResponseCreationOptions()
         {
-            ReasoningOptions = new(ResponseReasoningEffortLevel.Low), // rent due
+            ReasoningOptions = new(ResponseReasoningEffortLevel.Medium) // I've seen a case of low-effort reasoning straight *forgetting* a word when counting, like bro
+            {
+                ReasoningSummaryVerbosity =  ResponseReasoningSummaryVerbosity.Detailed
+            }, 
             Instructions = Config.values.haikuSystemPrompt,
         };
         var response = await clint.CreateResponseAsync(msg.Content, options);
@@ -95,6 +98,7 @@ internal class Haiku : ModuleBase
         int[] llmSyllableCounts = [];
         foreach (ResponseItem outItem in response.Value.OutputItems)
         {
+            Logger.Put($"LLM response item: {outItem}", LogType.Debug);
             if (outItem is ReasoningResponseItem reasoning)
             {
                 reasoningTrace += "\n" + string.Join('\n', reasoning.SummaryTextParts);
@@ -110,6 +114,7 @@ internal class Haiku : ModuleBase
 
                 foreach (ResponseContentPart contentPart in llmMessage.Content)
                 {
+                    Logger.Put($"LLM content part: {contentPart.Kind} - {contentPart.Text}", LogType.Debug);
                     switch (contentPart.Kind)
                     {
                         case ResponseContentPartKind.OutputText:
@@ -118,7 +123,6 @@ internal class Haiku : ModuleBase
                         case ResponseContentPartKind.Refusal:
                             Logger.Warn($"LLM refused to analyze message {msg.JumpLink}");
                             return false;
-
                     }
                 }
 
