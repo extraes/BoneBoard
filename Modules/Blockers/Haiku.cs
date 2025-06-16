@@ -1,6 +1,7 @@
 ﻿using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using OpenAI;
@@ -15,6 +16,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
+[AllowedProcessors(typeof(SlashCommandProcessor))]
+[Command("haiku")]
 internal class Haiku : ModuleBase
 {
     public Haiku(BoneBot bot) : base(bot)
