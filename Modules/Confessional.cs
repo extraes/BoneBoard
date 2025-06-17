@@ -168,7 +168,7 @@ internal class Confessional : ModuleBase
             if (string.IsNullOrEmpty(Config.values.openAiToken))
                 return;
             else
-                openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
+                openAiClient ??= new(Config.values.openAiToken);
         }
 
         string mainModel = Config.values.openAiConfessionalModel;
@@ -461,6 +461,7 @@ internal class Confessional : ModuleBase
 
         if (rewriteAi)
         {
+            await ctx.DeferResponseAsync(true);
             await BeginConfessionalRewriting(ctx, text);
             return;
         }
@@ -498,7 +499,10 @@ internal class Confessional : ModuleBase
                 return;
             }
         }
-        
+
+        if (Config.values.openAiToken is not null)
+            confessional.openAiClient ??= new(Config.values.openAiToken);
+
         if (confessional.openAiClient is null)
         {
             await ctx.FollowupAsync("AI rewriting is currently unavailable, so your confession can't be rewritten.", true);

@@ -24,7 +24,7 @@ internal struct LogType
         logCaller = true,
         writeToFile = true,
         nameColor = ConsoleColor.Gray,
-        textColor = ConsoleColor.DarkGray
+        textColor = ConsoleColor.Gray
     };
     public static readonly LogType Trace = new()
     {
