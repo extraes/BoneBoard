@@ -525,7 +525,7 @@ internal class Confessional : ModuleBase
             [
                 new SystemChatMessage(Config.values.openAiConfessionRewritePrompt),
                 new UserChatMessage(confessionToRewrite)
-            ], new ChatCompletionOptions() { MaxOutputTokenCount = 256 });
+            ]);
             rewritten = res.Value.Content[res.Value.Content.Count - 1].Text;
         }
         catch (Exception ex)

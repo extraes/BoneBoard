@@ -92,7 +92,7 @@ internal class Config
     public string sanityAffirmative = "Yes";
     public string sanityNegative = "No";
     public string openAiConfessionalModel = "gpt-3.5-turbo";
-    public string openAiConfessionalSystemPrompt = "You're a rewriting/rephrasing buddy. Don't modify the intent or significant content of what you're given, just rewrite it in an anonymizing way.";
+    public string openAiConfessionalSystemPrompt = "You're a rewriting/rephrasing buddy. Don't modify the intent or significant content of what you're given, just rewrite/reword it in a way that would make identifying the original writer based on typing patterns more difficult.";
     public string openAiConfessionalPrompt = "Confess your sins.";
     public string openAiConfessionalSanityPrompt = "To any text given, respond with \"Yes\", or \"No\", depending on whether or not it is coherent and makes sense to be sent as an anonymous \"confession\" message.";
     public int confessionalCooldownHoursMin = 24;
