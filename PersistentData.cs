@@ -25,6 +25,7 @@ internal class PersistentData
     public Dictionary<ulong, string> bufferChannelMessageFormats = new(); // channel id -> message format string
     public Dictionary<ulong, ulong> imageRoyaleSubmissions = new(); // submitter id -> message id
     public Dictionary<ulong, ulong> videoRoyaleSubmissions = new(); // submitter id -> message id
+    public HashSet<string> usedHaikus = new();
     public List<ulong> aiConfessionals = new(); // message id
     public Dictionary<ulong, DateTime> confessionalRevealTime = new(); // message id -> reveal datetime
     public ulong lastFrogKing;
