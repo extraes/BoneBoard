@@ -17,6 +17,8 @@ internal partial class ModuleBase
     {
         try
         {
+            if (reason is not null)
+                Logger.Put($"Deleting message {msg} for reason '{reason}'");
             await msg.DeleteAsync(reason);
             return true;
         }

@@ -71,6 +71,7 @@ internal class Haiku : ModuleBase
         if (lines.Length < 3)
         {
             await TryDeleteAsync(msg, "message not haiku | ancient japan memory | experience woe.");
+            reasoningTraces[msg.Id] = "Less than 3 lines";
             return true;
         }
 
@@ -88,6 +89,7 @@ internal class Haiku : ModuleBase
         if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId))
         {
             await TryDeleteAsync(msg, "the works of others | the blood, sweat, tears poured in them | are not yours to take");
+            reasoningTraces[msg.Id] = "haiku already posted";
             return true;
         }
 
@@ -114,6 +116,7 @@ internal class Haiku : ModuleBase
                     if (part.Text == "No")
                     {
                         await TryDeleteAsync(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
+                        reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
                         try
                         {
                             if (msg.Author is DiscordMember member)
