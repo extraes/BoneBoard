@@ -96,6 +96,7 @@ internal class Haiku : ModuleBase
 
         // wasnt reused -- now mark it down as used
         PersistentData.values.usedHaikus.Add(haikuSerialize);
+        PersistentData.WritePersistentData();
 
         // determine effort first because 4o is a cheaper, non-reasoning model, lol
         ChatMessage[] messages =
