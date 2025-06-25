@@ -66,12 +66,13 @@ internal class Haiku : ModuleBase
                 openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
         }
 
-        // do quick checks for haiku
+        // do quick check for haiku
         string[] lines = content.Split('\n');
         if (lines.Length < 3)
         {
             await TryDeleteAsync(msg, "message not haiku | ancient japan memory | experience woe.");
             reasoningTraces[msg.Id] = "Less than 3 lines";
+            Logger.Put($"not 3 lines '{content}' -- lines length = {lines.Length}");
             return true;
         }
 
