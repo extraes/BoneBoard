@@ -48,8 +48,8 @@ internal class Haiku : ModuleBase
             return false;
 
         string content = msg.Content;
-        if (msg.ReferencedMessage is not null && msg.Flags.HasValue && msg.Flags.Value.HasFlag(DiscordMessageFlags.IsCrosspost))
-            content = msg.ReferencedMessage.Content;
+        if (msg.Reference?.Type == DiscordMessageReferenceType.Forward && (msg.MessageSnapshots?.Count ?? 0) > 0)
+            content = string.Join('\n', msg.MessageSnapshots!.Select(m => m.Message.Content));
 
         if (content.Length == 0) // empty message/only attachments
             return false;

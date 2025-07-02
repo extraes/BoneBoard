@@ -83,7 +83,7 @@ internal class ModeratorIgnore : ModuleBase
 
     [Command("forTime"), Description("Ignores you/someone else for a given length of time")]
     [RequireApplicationOwner]
-    public static async Task IgnoreFor(SlashCommandContext ctx, int count, TimeUnit unit, DiscordMember? member = null, bool overwrite = false)
+    public static async Task IgnoreFor(SlashCommandContext ctx, int count, TimeUnit unit, DiscordMember? member = null, bool overwrite = true)
     {
         member ??= ctx.Member;
         if (member is null)
@@ -124,7 +124,7 @@ internal class ModeratorIgnore : ModuleBase
     [Command("forCount"), Description("Ignores you/someone else for a given number of events")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task IgnoreFor(SlashCommandContext ctx, int count, DiscordMember? member = null, bool overwrite = false)
+    public static async Task IgnoreFor(SlashCommandContext ctx, int count, DiscordMember? member = null, bool overwrite = true)
     {
         member ??= ctx.Member;
         if (member is null || BoneBot.Bots[ctx.Client].IsMe(member))

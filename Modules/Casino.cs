@@ -240,7 +240,7 @@ internal class Casino : ModuleBase
         GivePoints(ctx.User, -wager);
 
         var deck = new Cards.Deck();
-        deck.Shuffle((int)ctx.Interaction.Id);
+        deck.Shuffle();
 
         await ctx.DeferResponseAsync(ephemeral);
 
@@ -402,7 +402,7 @@ internal class Casino : ModuleBase
         Cards.Deck deck = new();
         deck.Exclude(dealerHand);
         deck.Exclude(playerHand);
-        deck.Shuffle((int)(interaction.Channel.Id ^ interaction.User.Id));
+        deck.Shuffle();
         //deck.Shuffle();
 
         if (dealerHand.Count == 1)
