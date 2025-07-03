@@ -54,8 +54,7 @@ internal class Haiku : ModuleBase
         if (content.Length == 0) // empty message/only attachments
             return false;
 
-        // editing a valid message shouldnt result in deletion
-        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId) && !msg.IsEdited)
+        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId) )
             return false;
 
 
@@ -87,8 +86,9 @@ internal class Haiku : ModuleBase
 
         string haikuSerialize = line1 + line2 + line3;
         ulong authorId = msg.Author?.Id ?? 0;
+        // editing a valid message shouldnt result in deletion
         // exempt owners bc it could contain a dev whos testing shit
-        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId))
+        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId) && !msg.IsEdited)
         {
             await TryDeleteAsync(msg, "the works of others | the blood, sweat, tears poured in them | are not yours to take");
             reasoningTraces[msg.Id] = "haiku already posted";
