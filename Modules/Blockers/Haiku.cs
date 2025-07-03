@@ -54,7 +54,8 @@ internal class Haiku : ModuleBase
         if (content.Length == 0) // empty message/only attachments
             return false;
 
-        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId))
+        // editing a valid message shouldnt result in deletion
+        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId) && !msg.IsEdited)
             return false;
 
 
