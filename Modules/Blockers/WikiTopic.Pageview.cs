@@ -61,7 +61,7 @@ internal partial class WikiTopic
         }
     }
 
-    public static async Task<PageviewsResponse> GetArticlePageviewsAsync(
+    public static async Task<PageviewsResponse?> GetArticlePageviewsAsync(
         WikiClient client,
         string project          /* e.g. "en.wikipedia.org" */,
         string article          /* URI-encoded title */,
@@ -77,6 +77,14 @@ internal partial class WikiTopic
         var url = $"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/{project}/all-access/user/{article.Replace(' ', '_')}/daily/{start:yyyyMMdd}/{end:yyyyMMdd}";
         Logger.Warn("The wikimedia foundation WILL be hearing from me.......... at the url " + url);
         // WikiClient.InvokeAsync<T> will send a GET to https://{host}/api/rest_v1/{url}
-        return await client.InvokeAsync<PageviewsResponse>(url, new PageviewRequest("yeah"), PageviewResponseParser.Instance, default);
+        try
+        {
+            return await client.InvokeAsync<PageviewsResponse>(url, new PageviewRequest("yeah"), PageviewResponseParser.Instance, default);
+        }
+        catch(Exception ex)
+        {
+            Logger.Warn("GetArticlePageviewsAsync failed -- returning null", ex);
+            return null;
+        }
     }
 }

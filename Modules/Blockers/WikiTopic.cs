@@ -173,7 +173,10 @@ internal partial class WikiTopic : ModuleBase
                     Logger.Put($"Random wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
                 
                     var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", randomPage.Title!, DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
-                    int sum = views.items.Sum(i => i.views);
+                    
+                    int sum = views?.items.Sum(i => i.views) ?? -1;
+                    if (sum == -1)
+                        continue;
                     Logger.Put($"Wiki topic '{randomPage.Title}' view count in past 30 days: {sum}");
                     needReroll = sum < Config.values.wikiTopicMinMonthlyViews;
                     needReroll |= (randomPage.Content?.Length ?? int.MaxValue) > Config.values.wikiTopicMaxLengthChars;
