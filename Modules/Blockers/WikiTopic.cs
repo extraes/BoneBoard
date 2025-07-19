@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using WikiClientLibrary;
 using WikiClientLibrary.Client;
 using WikiClientLibrary.Generators;
 using WikiClientLibrary.Pages;
@@ -166,6 +167,7 @@ internal partial class WikiTopic : ModuleBase
             while (page is null || needReroll)
             {
                 var pageGen = new RandomPageGenerator(site);
+                pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
                     Logger.Put($"Random wiki topic selected: {randomPage.Title}");
