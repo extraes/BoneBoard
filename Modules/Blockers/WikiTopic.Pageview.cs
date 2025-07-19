@@ -75,6 +75,7 @@ internal partial class WikiTopic
         if (end == default)
             end = DateOnly.FromDateTime(DateTime.UtcNow);
         var url = $"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/{project}/all-access/user/{Uri.EscapeDataString(article)}/daily/{start:yyyyMMdd}/{end:yyyyMMdd}";
+        Logger.Warn("The wikimedia foundation WILL be hearing from me.......... at the url " + url);
         // WikiClient.InvokeAsync<T> will send a GET to https://{host}/api/rest_v1/{url}
         return await client.InvokeAsync<PageviewsResponse>(url, new PageviewRequest("yeah"), PageviewResponseParser.Instance, default);
     }

@@ -170,7 +170,7 @@ internal partial class WikiTopic : ModuleBase
                 pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
-                    Logger.Put($"Random wiki topic selected: {randomPage.Title}");
+                    Logger.Put($"Random wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
                 
                     var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", Uri.EscapeDataString(randomPage.Title!), DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
                     int sum = views.items.Sum(i => i.views);
