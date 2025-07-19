@@ -81,6 +81,7 @@ internal partial class BoneBot
             new NoVowels(this),
             new SheOnMyTill(this),
             new Haiku(this),
+            new WikiTopic(this),
         ];
         casino = new(this);
         hangman = new(this);

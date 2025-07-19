@@ -34,6 +34,11 @@ internal class PersistentData
     public string currHangmanGuessed = "";
     public int currHangmanState = 0;
 
+    public Dictionary<ulong, ulong> wikiTopicAnnounceMessages = new();
+    public DateTime lastTopicSwitchTime = DateTime.Now.Subtract(TimeSpan.FromHours(24));
+    public string wikiTopicMessageLink = "";
+    public string currentWikiTopic = "";
+
     public Dictionary<ulong, int> casinoPoints = new(); // user id -> points
 
     static PersistentData()
