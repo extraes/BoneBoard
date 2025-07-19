@@ -234,7 +234,7 @@ internal partial class WikiTopic : ModuleBase
     [Description("Set the topic for the next 12 hours")]
     public static async Task SetTopic(
         SlashCommandContext ctx,
-        [Parameter("articleTitle")] string articleTitle)
+        [Parameter("articleTitle")] string? articleTitle = null)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
