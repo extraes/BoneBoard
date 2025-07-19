@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using WikiClientLibrary.Client;
+using WikiClientLibrary.Generators;
 using WikiClientLibrary.Pages;
 using WikiClientLibrary.Sites;
 using static System.Net.WebRequestMethods;
@@ -164,15 +165,27 @@ internal partial class WikiTopic : ModuleBase
             bool needReroll = true;
             while (page is null || needReroll)
             {
-                page = new WikiPage(site, "Special:Random");
-                await page.RefreshAsync(PageQueryOptions.ResolveRedirects);
-                Logger.Put($"Random wiki topic selected: {page.Title}");
+                var pageGen = new RandomPageGenerator(site);
+                await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
+                {
+                    Logger.Put($"Random wiki topic selected: {randomPage.Title}");
                 
-                var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", Uri.EscapeDataString(page.Title!), DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
-                int sum = views.items.Sum(i => i.views);
-                Logger.Put($"Wiki topic '{page.Title}' view count in past 30 days: {sum}");
-                needReroll = sum < Config.values.wikiTopicMinMonthlyViews;
-                needReroll |= (page.Content?.Length ?? int.MaxValue) > Config.values.wikiTopicMaxLengthChars;
+                    var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", Uri.EscapeDataString(randomPage.Title!), DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
+                    int sum = views.items.Sum(i => i.views);
+                    Logger.Put($"Wiki topic '{randomPage.Title}' view count in past 30 days: {sum}");
+                    needReroll = sum < Config.values.wikiTopicMinMonthlyViews;
+                    needReroll |= (randomPage.Content?.Length ?? int.MaxValue) > Config.values.wikiTopicMaxLengthChars;
+
+                    if (!needReroll)
+                    {
+                        page = randomPage;
+                        break;
+                    }
+                    else
+                    {
+                        Logger.Put($"Rerolling wiki topic (views {sum}, length {randomPage.Content?.Length ?? -1})");
+                    }
+                }
             }
         }
 
