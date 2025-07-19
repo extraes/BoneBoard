@@ -227,6 +227,7 @@ internal partial class WikiTopic : ModuleBase
             statusMessages[channelId] = sentMsg;
             PersistentData.values.wikiTopicAnnounceMessages[channelId] = sentMsg.Id;
         }
+        PersistentData.WritePersistentData();
         Logger.Put("Successfully changed wiki topic");
     }
 
