@@ -44,7 +44,11 @@ internal partial class WikiTopic : ModuleBase
         if (isTopicStale || string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
             await SetNewTopic();
         else if (string.IsNullOrWhiteSpace(topicStr) && !string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
+        {
+            var saved = PersistentData.values.lastTopicSwitchTime;
             await SetNewTopic(PersistentData.values.currentWikiTopic);
+            PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer when starting up
+        }
 
         TopicRolloverLoop(topicRollover.Token);
     }
@@ -108,7 +112,9 @@ internal partial class WikiTopic : ModuleBase
                 return false;
             else
             {
+                var saved = PersistentData.values.lastTopicSwitchTime;
                 await SetNewTopic(PersistentData.values.currentWikiTopic);
+                PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer just bc someone sent a message
             }
         }
 
@@ -203,11 +209,12 @@ internal partial class WikiTopic : ModuleBase
                     await Task.Delay(250); // give the world some time to edit more pages, lol
                 }
             }
+
         }
 
+        PersistentData.values.lastTopicSwitchTime = DateTime.Now;
         Logger.Put($"Settled on wiki topic {page.Title} ({page.Content?.Length ?? -1} char long)");
         topicStr = page.Content;
-        PersistentData.values.lastTopicSwitchTime = DateTime.Now;
         PersistentData.values.currentWikiTopic = page.Title ?? "";
         foreach (ulong channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
         {
