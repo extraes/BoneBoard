@@ -114,7 +114,7 @@ internal partial class WikiTopic : ModuleBase
 
         if (topicStr is null)
         {
-            Logger.Warn("SetNewTopic failed to set a topic");
+            Logger.Warn("No topic currently set!");
             return false;
         }
 
@@ -165,7 +165,7 @@ internal partial class WikiTopic : ModuleBase
         if (articleTitle is not null)
         {
             page = new WikiPage(site, articleTitle);
-            await page.RefreshAsync(PageQueryOptions.ResolveRedirects);
+            await page.RefreshAsync(PageQueryOptions.FetchContent);
         }
         else
         {
@@ -249,6 +249,7 @@ internal partial class WikiTopic : ModuleBase
             return;
         }
 
+        wikitopic.RestartRollover();
         await wikitopic.SetNewTopic(articleTitle);
         await ctx.FollowupAsync("Changed wiki topic!");
     }
