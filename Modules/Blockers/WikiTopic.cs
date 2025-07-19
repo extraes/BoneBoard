@@ -148,6 +148,12 @@ internal partial class WikiTopic : ModuleBase
 
     private async Task SetNewTopic(string? articleTitle = null)
     {
+        if (Config.values.channelsWhereMessagesMustBeOnTopic.Count == 0)
+        {
+            Logger.Warn("No channels configured for wiki topic enforcement, skipping topic set");
+            return;
+        }
+
         wikiClint ??= new WikiClient()
         {
             ClientUserAgent = "boneboard/1.0",
@@ -166,11 +172,11 @@ internal partial class WikiTopic : ModuleBase
             bool needReroll = true;
             while (page is null || needReroll)
             {
-                var pageGen = new RandomPageGenerator(site);
+                var pageGen = new RecentChangesGenerator(site);
                 pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
-                    Logger.Put($"Random wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
+                    Logger.Put($"\"Random\" (recently edited, lol) wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
                 
                     var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", randomPage.Title!, DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
                     
@@ -190,6 +196,11 @@ internal partial class WikiTopic : ModuleBase
                     {
                         Logger.Put($"Rerolling wiki topic (views {sum}, length {randomPage.Content?.Length ?? -1})");
                     }
+                }
+
+                if (page is null)
+                {
+                    await Task.Delay(250); // give the world some time to edit more pages, lol
                 }
             }
         }
