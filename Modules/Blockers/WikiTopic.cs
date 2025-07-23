@@ -31,7 +31,8 @@ internal partial class WikiTopic : ModuleBase
     {
         Config.ConfigChanged += () => { clint = null; wikiClint = null; topicStr = null; };
     }
-
+    const int HOURS_PER_TOPIC_CHANGE = 4;
+    Dictionary<ulong, string> whyAUsersMessageWasDeleted = new();
     Dictionary<ulong, DiscordMessage> statusMessages = new();
     WikiClient? wikiClint;
     OpenAIClient? clint;
@@ -40,13 +41,13 @@ internal partial class WikiTopic : ModuleBase
 
     protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
     {
-        bool isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(12) < DateTime.Now;
+        bool isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) < DateTime.Now;
         if (isTopicStale || string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
             await SetNewTopic();
         else if (string.IsNullOrWhiteSpace(topicStr) && !string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
         {
             var saved = PersistentData.values.lastTopicSwitchTime;
-            await SetNewTopic(PersistentData.values.currentWikiTopic);
+            await SetNewTopic(PersistentData.values.currentWikiTopic, false);
             PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer when starting up
         }
 
@@ -64,7 +65,7 @@ internal partial class WikiTopic : ModuleBase
     {
         while (!token.IsCancellationRequested)
         {
-            TimeSpan timeToWait = PersistentData.values.lastTopicSwitchTime.AddHours(12) - DateTime.Now;
+            TimeSpan timeToWait = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) - DateTime.Now;
             if (timeToWait.TotalMilliseconds > 0)
             {
                 try
@@ -74,7 +75,10 @@ internal partial class WikiTopic : ModuleBase
                 catch { }
             }
             if (token.IsCancellationRequested)
-                break;
+            {
+                Logger.Put($"Topic rollover cancelled! Presumably a new loop has started up? Hopefully at least!");
+                return;
+            }
             await SetNewTopic();
         }
     }
@@ -95,7 +99,7 @@ internal partial class WikiTopic : ModuleBase
 
     private async Task<bool> MessageCheckAsync(DiscordMessage msg)
     {
-        if (bot.IsMe(msg.Author))
+        if (bot.IsMe(msg.Author) || msg.Author is null)
             return false;
         if (!Config.values.channelsWhereMessagesMustBeOnTopic.Contains(msg.ChannelId))
             return false;
@@ -142,6 +146,7 @@ internal partial class WikiTopic : ModuleBase
             if (part.Text.Contains("\"on_topic\": false"))
             {
                 Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", LogType.Normal, cleanMultiline: false);
+                whyAUsersMessageWasDeleted[msg.Author.Id] = $"Beamed for the following:```\n{content.Replace("```", "'''")}```{part.Text}";
                 await TryDeleteAsync(msg, "Off topic");
                 return true;
             }
@@ -152,7 +157,7 @@ internal partial class WikiTopic : ModuleBase
 
 
 
-    private async Task SetNewTopic(string? articleTitle = null)
+    private async Task SetNewTopic(string? articleTitle = null, bool sendNewMessage = true)
     {
         if (Config.values.channelsWhereMessagesMustBeOnTopic.Count == 0)
         {
@@ -178,7 +183,7 @@ internal partial class WikiTopic : ModuleBase
             bool needReroll = true;
             while (page is null || needReroll)
             {
-                var pageGen = new RecentChangesGenerator(site);
+                var pageGen = new RandomPageGenerator(site);
                 pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
@@ -216,30 +221,33 @@ internal partial class WikiTopic : ModuleBase
         Logger.Put($"Settled on wiki topic {page.Title} ({page.Content?.Length ?? -1} char long)");
         topicStr = page.Content;
         PersistentData.values.currentWikiTopic = page.Title ?? "";
-        foreach (ulong channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
+        if (sendNewMessage)
         {
-            // dont need to update message
-            //if (!statusMessages.TryGetValue(channelId, out var oldMsg) && PersistentData.values.wikiTopicAnnounceMessages.TryGetValue(channelId, out ulong oldMsgId))
-            //{
-            //    try
-            //    {
-            //        var channel = await bot.client.GetChannelAsync(channelId);
-            //        var msg = TryFetchMessage(channel, oldMsgId);
-            //    }
-            //    catch { }
-            //}
-            Logger.Put($"Posting new topic message in channel {channelId}");
-            var channel = await bot.client.GetChannelAsync(channelId);
-            var sentMsg = await channel.SendMessageAsync($"New topic!!! better read up on [{page.Title}](https://en.wikipedia.org/wiki/{Uri.EscapeDataString(page.Title!)}) {Formatter.Timestamp(TimeSpan.FromHours(12), TimestampFormat.RelativeTime)}");
-            statusMessages[channelId] = sentMsg;
-            PersistentData.values.wikiTopicAnnounceMessages[channelId] = sentMsg.Id;
+            foreach (ulong channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
+            {
+                // dont need to update message
+                //if (!statusMessages.TryGetValue(channelId, out var oldMsg) && PersistentData.values.wikiTopicAnnounceMessages.TryGetValue(channelId, out ulong oldMsgId))
+                //{
+                //    try
+                //    {
+                //        var channel = await bot.client.GetChannelAsync(channelId);
+                //        var msg = TryFetchMessage(channel, oldMsgId);
+                //    }
+                //    catch { }
+                //}
+                Logger.Put($"Posting new topic message in channel {channelId}");
+                var channel = await bot.client.GetChannelAsync(channelId);
+                var sentMsg = await channel.SendMessageAsync($"New topic!!! better read up on [{page.Title}](https://en.wikipedia.org/wiki/{Uri.EscapeDataString(page.Title!)}) {Formatter.Timestamp(TimeSpan.FromHours(HOURS_PER_TOPIC_CHANGE), TimestampFormat.RelativeTime)}");
+                statusMessages[channelId] = sentMsg;
+                PersistentData.values.wikiTopicAnnounceMessages[channelId] = sentMsg.Id;
+            }
         }
         PersistentData.WritePersistentData();
         Logger.Put("Successfully changed wiki topic");
     }
 
     [Command("set")]
-    [Description("Set the topic for the next 12 hours")]
+    [Description("Set the topic for the next few hours (until the next topic switch should occur)")]
     public static async Task SetTopic(
         SlashCommandContext ctx,
         [Parameter("articleTitle")] string? articleTitle = null)
@@ -257,7 +265,33 @@ internal partial class WikiTopic : ModuleBase
         }
 
         wikitopic.RestartRollover();
-        await wikitopic.SetNewTopic(articleTitle);
+        await wikitopic.SetNewTopic(articleTitle, true);
         await ctx.FollowupAsync("Changed wiki topic!");
+    }
+
+    [Command("ermmmmmMods")]
+    [Description("@extraes WHY WAS MY MESSAGE DELETED I WAS ON TOPIC")] 
+    public static async Task AntiWhine(SlashCommandContext ctx, [Parameter("otherUser"), Description("Only usable if you're a moderator")] DiscordUser? target = null)
+    {
+        if (target != null && await SlashCommands.ModGuard(ctx))
+            return;
+        target ??= ctx.User;
+
+        await ctx.DeferResponseAsync(true);
+
+        var wikitopic = BoneBot.Bots[ctx.Client].blockers.OfType<WikiTopic>().FirstOrDefault();
+        if (wikitopic is null)
+        {
+            await ctx.FollowupAsync("uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
+            return;
+        }
+
+        if (wikitopic.whyAUsersMessageWasDeleted.TryGetValue(target.Id, out string? reason))
+        {
+            await ctx.FollowupAsync(reason);
+            return;
+        }
+
+        await ctx.FollowupAsync("nothing was found for you, get beamed");
     }
 }
