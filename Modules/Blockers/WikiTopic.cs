@@ -89,7 +89,8 @@ internal partial class WikiTopic : ModuleBase
         {
             return await MessageCheckAsync(msgCreatedArgs.Message);
         }
-        else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
+        
+        if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
             return await MessageCheckAsync(msgUpdatedArgs.Message);
         }
@@ -183,7 +184,7 @@ internal partial class WikiTopic : ModuleBase
             bool needReroll = true;
             while (page is null || needReroll)
             {
-                var pageGen = new RandomPageGenerator(site);
+                var pageGen = new RecentChangesGenerator(site);
                 pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
