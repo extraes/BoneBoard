@@ -66,14 +66,17 @@ internal partial class WikiTopic : ModuleBase
         while (!token.IsCancellationRequested)
         {
             TimeSpan timeToWait = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) - DateTime.Now;
-            if (timeToWait.TotalMilliseconds > 0)
+            // check every 60sec for a channel to be set in case one gets set while running 
+            if (timeToWait.TotalMilliseconds <= 0)
             {
-                try
-                {
-                    await Task.Delay(timeToWait, token);
-                }
-                catch { }
+                timeToWait = TimeSpan.FromMinutes(1);
             }
+            
+            try
+            {
+                await Task.Delay(timeToWait, token);
+            }
+            catch { }
             if (token.IsCancellationRequested)
             {
                 Logger.Put($"Topic rollover cancelled! Presumably a new loop has started up? Hopefully at least!");
