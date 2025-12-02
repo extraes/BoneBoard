@@ -13,6 +13,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Skeleton;
 
 namespace BoneBoard.Modules.Blockers;
 
@@ -231,10 +232,10 @@ internal class Haiku : ModuleBase
         await ctx.RespondAsync(sb.ToString(), true);
     }
 
-    [Command("getReasoning")]
-    [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
-    [RequireGuild]
-    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    // [Command("getReasoning")]
+    // [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
+    // [RequireGuild]
+    // [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task GetReasoning(SlashCommandContext ctx, DiscordMessage msg)
     {
         await ctx.DeferResponseAsync(true);

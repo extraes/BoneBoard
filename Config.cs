@@ -15,7 +15,7 @@ internal class Config
 {
     public static event Action? ConfigChanged;
 
-    public static Config values;
+    // public static Config values;
     private const string CFG_PATH = "./config.toml";
     internal string token = "";
     public string logPath = "./logs/";

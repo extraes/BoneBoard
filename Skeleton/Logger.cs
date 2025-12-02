@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace BoneBoard;
+namespace Skeleton;
 
 internal static class Logger
 {
@@ -17,9 +17,10 @@ internal static class Logger
 
     static Logger()
     {
-        int maxFiles = Config.values.maxLogFiles;
-        if (!Directory.Exists(Config.values.logPath)) Directory.CreateDirectory(Config.values.logPath);
-        string filePath = Path.Combine(Config.values.logPath, DateTime.Now.ToString(FILE_DATE_FORMAT) + ".log");
+        SkeletonConfig cfg = GlobalConfigBase.GetInstance<SkeletonConfig>("./logConfig.toml");
+        int maxFiles = cfg.maxLogFiles;
+        if (!Directory.Exists(cfg.logPath)) Directory.CreateDirectory(cfg.logPath);
+        string filePath = Path.Combine(cfg.logPath, DateTime.Now.ToString(FILE_DATE_FORMAT) + ".log");
 
         Console.WriteLine("Initializing logger");
         logFile = File.AppendText(filePath);
@@ -27,7 +28,7 @@ internal static class Logger
 
         // delete oldest log files over max log file count
         // https://stackoverflow.com/questions/20486559/get-a-list-of-files-in-a-directory-in-descending-order-by-creation-date-using-c#20486570
-        DirectoryInfo dir = new(Config.values.logPath);
+        DirectoryInfo dir = new(cfg.logPath);
         FileInfo[] files = dir.GetFiles().OrderByDescending(f => f.LastWriteTime).ToArray();
         foreach (FileInfo file in files.Skip(maxFiles))
         {

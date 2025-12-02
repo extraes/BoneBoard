@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace BoneBoard;
 
 [Flags]
-internal enum ConfessionalRequirements
+public enum ConfessionalRequirements
 {
     NONE,
     ROLE = 1 << 0,

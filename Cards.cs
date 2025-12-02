@@ -41,28 +41,30 @@ internal static class Cards
         return sb.ToString();
     }
 
+    public static int RankValue(Rank rank) => rank switch
+    {
+        Rank.Ace => 11,
+        Rank.Two => 2,
+        Rank.Three => 3,
+        Rank.Four => 4,
+        Rank.Five => 5,
+        Rank.Six => 6,
+        Rank.Seven => 7,
+        Rank.Eight => 8,
+        Rank.Nine => 9,
+        Rank.Ten => 10,
+        Rank.Jack => 10,
+        Rank.Queen => 10,
+        Rank.King => 10,
+        _ => 0,
+    };
+
     public static int HandValue(IEnumerable<Card> hand)
     {
         int value = 0;
         foreach (Card card in hand)
         {
-            value += card.Rank switch
-            {
-                Rank.Ace => 11,
-                Rank.Two => 2,
-                Rank.Three => 3,
-                Rank.Four => 4,
-                Rank.Five => 5,
-                Rank.Six => 6,
-                Rank.Seven => 7,
-                Rank.Eight => 8,
-                Rank.Nine => 9,
-                Rank.Ten => 10,
-                Rank.Jack => 10,
-                Rank.Queen => 10,
-                Rank.King => 10,
-                _ => 0,
-            };
+            value += RankValue(card.Rank);
         }
 
         if (value > 21)

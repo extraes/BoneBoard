@@ -32,6 +32,7 @@ internal class SlashCommands
             return true;
         }
 
+        BotConfig.
         if (ownerOnly && !Config.values.owners.Contains(ctx.Member.Id))
         {
             await ctx.RespondAsync("nop", true);

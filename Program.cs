@@ -1,28 +1,36 @@
 ﻿using System.Runtime.CompilerServices;
+using Skeleton;
 
-namespace BoneBoard
+namespace BoneBoard;
+
+internal class Program
 {
-    internal class Program
-    {
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-        static BoneBot bot;
+    static BoneBot bot;
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 
-        [MethodImpl(MethodImplOptions.NoOptimization)]
-        static async Task Main(string[] args)
+    [MethodImpl(MethodImplOptions.NoOptimization)]
+    static async Task Main(string[] args)
+    {
+        Logger.Put("Pre-initializing persistent data...");
+        _ = PersistentData.values;
+
+        if (string.IsNullOrWhiteSpace(Config.values.token))
         {
-            Logger.Put("Pre-initializing persistent data...");
-            _ = PersistentData.values;
-
-            Logger.Put("Initializing bot...");
-            bot = new BoneBot(Config.values.token);
-            bot.Init();
-
-            while(true)
+            for (int i = 0; i < 5; i++)
             {
-                await Task.Delay(60 * 1000);
-                // just here so i can use the debugger if my fucking internet kills itself again
+                Logger.Put("HI PLEASE PUT IN A TOKEN IN THE NEWLY GENERATED CONFIG FILE THX!!! :)");
             }
+        }
+        
+        Logger.Put("Initializing bot...");
+        bot = new BoneBot(Config.values.token);
+        bot.Init();
+
+        while(true)
+        {
+            await Task.Delay(60 * 1000);
+            // just here so i can use the debugger if my fucking internet kills itself again
         }
     }
 }

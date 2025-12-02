@@ -11,26 +11,26 @@
     <Compile Remove="ExtraesDiscordManager\**" />
     <EmbeddedResource Remove="ExtraesDiscordManager\**" />
     <None Remove="ExtraesDiscordManager\**" />
+    <Compile Remove="Skeleton\**" />
+    <EmbeddedResource Remove="Skeleton\**" />
+    <None Remove="Skeleton\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />
     <PackageReference Include="CircularBuffer" Version="1.4.0" />
     <PackageReference Include="Csv" Version="2.0.170" />
     <PackageReference Include="CXuesong.MW.WikiClientLibrary" Version="0.9.0-int.3" />
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02529" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02529" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02529" />
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02557" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02551" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02551" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.5.25277.114" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0-preview.5.25277.114" />
     <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
     <PackageReference Include="Samboy063.Tomlet" Version="6.1.0" />
     <PackageReference Include="SixLabors.Fonts" Version="2.1.3" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="ExtraesDiscordManager\ExtraesDiscordManager.csproj" />
   </ItemGroup>
 
 </Project>

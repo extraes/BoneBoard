@@ -14,6 +14,7 @@ using OpenAI.Chat;
 using System.ComponentModel;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus;
+using Skeleton;
 
 namespace BoneBoard.Modules;
 

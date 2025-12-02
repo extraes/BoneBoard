@@ -11,6 +11,7 @@ using DSharpPlus.Entities;
 using DSharpPlus;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Commands.ContextChecks;
+using Skeleton;
 
 namespace BoneBoard.Modules;
 

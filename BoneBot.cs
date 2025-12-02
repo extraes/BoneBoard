@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 
 namespace BoneBoard;
 
-internal partial class BoneBot
+internal class BoneBot : ISklie
 {
 
     public static Dictionary<DiscordClient, BoneBot> Bots { get; } = new();
@@ -72,25 +72,25 @@ internal partial class BoneBot
         SlashCommandProcessor scp = new();
         MessageCommandProcessor mcp = new();
 
-        blockers =
-        [
-            new ModeratorIgnore(this),
-            new CustomEmojisAndStickers(this),
-            new FlagRestriction(this),
-            new WordPercentage(this),
-            new NoVowels(this),
-            new SheOnMyTill(this),
-            new Haiku(this),
-            new WikiTopic(this),
-        ];
+        // blockers =
+        // [
+        //     new ModeratorIgnore(this),
+        //     new CustomEmojisAndStickers(this),
+        //     new FlagRestriction(this),
+        //     new WordPercentage(this),
+        //     new NoVowels(this),
+        //     new SheOnMyTill(this),
+        //     new Haiku(this),
+        //     new WikiTopic(this),
+        // ];
         casino = new(this);
-        hangman = new(this);
-        frogRole = new(this);
-        confessions = new(this);
-        stargrid = new(this);
-        msgBuffer = new(this);
-        imageRoyale = new(this);
-        videoRoyale = new(this);
+        // hangman = new(this);
+        // frogRole = new(this);
+        // confessions = new(this);
+        // stargrid = new(this);
+        // msgBuffer = new(this);
+        // imageRoyale = new(this);
+        // videoRoyale = new(this);
 
         clientBuilder.UseCommands((isp, ce) =>
         {

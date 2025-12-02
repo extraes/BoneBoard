@@ -1,4 +1,4 @@
-﻿using DSharpPlus.Entities;
+using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Exceptions;
 using System;
@@ -9,9 +9,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Skeleton;
 
-namespace BoneBoard.Modules;
+namespace Skeleton;
 
-internal partial class ModuleBase
+public abstract partial class SkModuleBase
 {
     [DebuggerStepThrough]
     protected async Task<bool> TryDeleteAsync(DiscordMessage msg, string? reason = null)
@@ -63,6 +63,7 @@ internal partial class ModuleBase
 
     protected DiscordUser? GetUser(DiscordEventArgs args)
     {
+        // ReSharper disable EmptyGeneralCatchClause
         dynamic dynargs = args;
         try
         {
@@ -88,6 +89,7 @@ internal partial class ModuleBase
             return dynargs.UserAfter;
         }
         catch { }
+        // ReSharper restore EmptyGeneralCatchClause
 
         return null;
     }

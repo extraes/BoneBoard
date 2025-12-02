@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BoneBoard;
+namespace Skeleton;
 
 internal struct LogType
 {
@@ -24,7 +24,7 @@ internal struct LogType
         logCaller = true,
         writeToFile = true,
         nameColor = ConsoleColor.Gray,
-        textColor = ConsoleColor.Gray
+        textColor = ConsoleColor.DarkGray
     };
     public static readonly LogType Trace = new()
     {
