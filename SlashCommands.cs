@@ -166,7 +166,7 @@ internal class SlashCommands
 
         StringBuilder sb = new();
         sb.AppendLine("# Monopoly Men");
-        foreach (var kvp in PersistentData.values.casinoPoints.OrderBy(kvp => kvp.Value))
+        foreach (var kvp in PersistentData.values.casinoPoints.OrderByDescending(kvp => kvp.Value))
         {
             if (sb.Length > 1800)
                 break;
