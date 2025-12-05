@@ -100,7 +100,7 @@ internal partial class Casino
         if (msg is null)
             return;
         
-        var totalSb = new StringBuilder("# Predictions");
+        var totalSb = new StringBuilder("# Predictions\n");
         
         const string AND_MORE = "\n*and more...*";
         
