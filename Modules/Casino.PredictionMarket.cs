@@ -101,20 +101,22 @@ internal partial class Casino
             return;
         
         var totalSb = new StringBuilder("# Predictions\n");
-        
+
+        const string COMMAND_PROMPT = "-# *Use `/casino predict` to place a bet!*";
         const string AND_MORE = "\n*and more...*";
         
         var sb = new StringBuilder();
         
         foreach (var pEvent in PersistentData.values.predictionEvents.OrderBy(e => e.createdAt))
         {
+            sb.AppendLine("__.                                                                                    .__");
             sb.AppendLine($"## {pEvent.title}");
-            sb.AppendLine(pEvent.criteriaDesc);
+            sb.AppendLine($"*\"{Formatter.Strip(pEvent.criteriaDesc)}\"*");
             sb.AppendLine(pEvent.IsLocked()
                 ? "Locked, now we wait..."
                 : $"Open, place your bets now! (Locks {Formatter.Timestamp(pEvent.lockAt)})");
             sb.AppendLine("Current market:");
-            sb.AppendLine($"- {pEvent.pointsFor.Values.Sum()} points saying that **it will true**");
+            sb.AppendLine($"- {pEvent.pointsFor.Values.Sum()} points saying that **it *will* come true**");
             sb.AppendLine($"- {pEvent.pointsAgainst.Values.Sum()} saying predicting **it will *not* come true**");
 
             if (totalSb.Length + sb.Length > 2000)
@@ -132,6 +134,10 @@ internal partial class Casino
         if (PersistentData.values.predictionEvents.Count == 0)
         {
             totalSb.AppendLine("-# Ain't nobody here but us chickens!");
+        }
+        else if (totalSb.Length < 2000 - COMMAND_PROMPT.Length)
+        {
+            totalSb.AppendLine(COMMAND_PROMPT);
         }
 
         try
