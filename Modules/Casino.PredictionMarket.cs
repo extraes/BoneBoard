@@ -149,6 +149,30 @@ internal partial class Casino
             Logger.Warn("Exception while updating prediction market message!", ex);
         }
     }
+
+    private async Task<PredictionEvent?> GetEventOrRespond(SlashCommandContext ctx, string title)
+    {
+        var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(title));
+        if (target is null)
+        {
+            await ctx.RespondAsync($"Couldn't find anything with that title for some reason. Strange.", true);
+            return null;
+        }
+
+        const int LEV_DIST_CUTOFF = 10;
+
+        int levDist = target.title.LevenshteinDistance(title);
+        Logger.Put($"LevDist from input '{title}' to found '{target.title}' - {levDist}");
+        bool levTooFar = levDist > LEV_DIST_CUTOFF;
+        bool doesntContainInput = !target.title.Contains(title, StringComparison.InvariantCultureIgnoreCase);
+        if (levTooFar && doesntContainInput)
+        {
+            await ctx.RespondAsync($"Found something named '{target.title}', but something tells me that's not what you're looking for.", true);
+            return null;
+        }
+
+        return target;
+    }
     
     [Command("createEvent"), Description("Let people bet on something.")]
     [RequireGuild]
@@ -180,25 +204,10 @@ internal partial class Casino
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
-
-        var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(originalTitle));
+        
+        var target = await GetEventOrRespond(ctx, originalTitle);
         if (target is null)
-        {
-            await ctx.RespondAsync($"Couldn't find anything with that title for some reason. Strange.", true);
             return;
-        }
-
-        const int LEV_DIST_CUTOFF = 10;
-
-        int levDist = target.title.LevenshteinDistance(originalTitle);
-        Logger.Put($"LevDist from input '{originalTitle}' to found '{target.title}' - {levDist}");
-        bool levTooFar = levDist > LEV_DIST_CUTOFF;
-        bool doesntContainInput = !target.title.Contains(newTitle, StringComparison.InvariantCultureIgnoreCase);
-        if (levTooFar && doesntContainInput)
-        {
-            await ctx.RespondAsync($"Found something named '{target.title}', but something tells me that's not what you're looking for.", true);
-            return;
-        } 
 
         string res = $"Found '{target.title}'\n";
         
@@ -229,12 +238,10 @@ internal partial class Casino
         if (await SlashCommands.ModGuard(ctx))
             return;
 
-        var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(title));
+        var target = await GetEventOrRespond(ctx, title);
         if (target is null)
-        {
-            await ctx.RespondAsync($"Couldn't find anything with that title for some reason. Strange.", true);
             return;
-        }
+        
 
         int forValue = target.pointsFor.Values.Sum();
         int forWagered = forValue - target.pointsFor[PredictionEvent.SEED_ID];
@@ -294,13 +301,10 @@ internal partial class Casino
             return;
         }
 
-        var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(title));
+        var target = await GetEventOrRespond(ctx, title);
         if (target is null)
-        {
-            await ctx.RespondAsync($"Couldn't find anything with that title for some reason. Strange.", true);
             return;
-        }
-
+        
         target.lockAt = DateTime.Now.AddHours(openForHours);
         
         PersistentData.WritePersistentData();
@@ -314,12 +318,9 @@ internal partial class Casino
     [RequireGuild]
     public async Task BetOnEvent(SlashCommandContext ctx, string title, int stake, bool willItHappen, bool overridePrevBets = false)
     {
-        var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(title));
+        var target = await GetEventOrRespond(ctx, title);
         if (target is null)
-        {
-            await ctx.RespondAsync($"Couldn't find anything with that title for some reason. Strange.", true);
             return;
-        }
 
         if (target.IsLocked())
         {
