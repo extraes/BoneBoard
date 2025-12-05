@@ -109,7 +109,7 @@ internal partial class Casino
         
         foreach (var pEvent in PersistentData.values.predictionEvents.OrderBy(e => e.createdAt))
         {
-            sb.AppendLine("__.                                                                                    .__");
+            sb.AppendLine("__                                                                                    __");
             sb.AppendLine($"## {pEvent.title}");
             sb.AppendLine($"*\"{Formatter.Strip(pEvent.criteriaDesc)}\"*");
             sb.AppendLine(pEvent.IsLocked()
