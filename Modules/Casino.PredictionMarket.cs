@@ -188,6 +188,18 @@ internal partial class Casino
             return;
         }
 
+        const int LEV_DIST_CUTOFF = 10;
+
+        int levDist = target.title.LevenshteinDistance(originalTitle);
+        Logger.Put($"LevDist from input '{originalTitle}' to found '{target.title}' - {levDist}");
+        bool levTooFar = levDist > LEV_DIST_CUTOFF;
+        bool doesntContainInput = !target.title.Contains(newTitle, StringComparison.InvariantCultureIgnoreCase);
+        if (levTooFar && doesntContainInput)
+        {
+            await ctx.RespondAsync($"Found something named '{target.title}', but something tells me that's not what you're looking for.", true);
+            return;
+        } 
+
         string res = $"Found '{target.title}'\n";
         
         if (!string.IsNullOrWhiteSpace(newTitle))
