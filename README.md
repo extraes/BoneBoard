@@ -20,3 +20,4 @@ All intended to run in only one server, though.
 - each module will have its own config fields that must be filled out in order to work
   - if you wamt to know what modules use what config fields, open their .cs file (boo! source code jumpscare!) and Ctrl+F for "Config.values.", lol
 - if you want Stargrid to work, you'll need to install the '[Twemoji-Mozilla](https://github.com/mozilla/twemoji-colr/releases)' font (for emojis), alongside whatever font you have in the config file (default is 'Comfortaa')
+  - also you'll need "gifsicle" installed (and in your OS's PATH so it can be used) in order for animated gif quotes to work

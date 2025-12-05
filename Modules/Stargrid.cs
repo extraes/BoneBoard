@@ -13,7 +13,8 @@ using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus.Commands.ContextChecks;
 using System.ComponentModel;
-using Skeleton;
+using SixLabors.ImageSharp.Formats.Gif;
+using StableCube.Media.Gifsicle;
 
 namespace BoneBoard.Modules;
 
@@ -22,6 +23,11 @@ namespace BoneBoard.Modules;
 internal class Stargrid : ModuleBase
 {
     static readonly DiscordPermissions ForceQuotePerms = new DiscordPermissions(DiscordPermission.ManageRoles, DiscordPermission.ManageMessages);
+
+    private static readonly GifsicleOptions gifsicleOptions = new GifsicleOptions()
+        .WithLossyness(50)
+        .WithOptimize(2)
+        .WithBatch(true); // tells gifsicle to in-place optimize
 
     DiscordChannel? outputChannel;
     public Stargrid(BoneBot bot) : base(bot)
@@ -88,13 +94,24 @@ internal class Stargrid : ModuleBase
             return;
         }
 
+        bool isGif = quote.Frames.Count > 1;
         using MemoryStream ms = new();
 
-        await quote.SaveAsPngAsync(ms);
+        if (isGif)
+        {
+            await quote.SaveAsGifAsync(ms, new GifEncoder()
+            {
+                ColorTableMode = GifColorTableMode.Local
+            });
+        }
+        else
+        {
+            await quote.SaveAsPngAsync(ms);
+        }
         ms.Position = 0;
 
         DiscordMessageBuilder dmb = new DiscordMessageBuilder()
-                                        .AddFile("quote.png", ms)
+                                        .AddFile($"quote.{(isGif ? "gif" : "png")}", ms)
                                         .WithContent($"[From {displayName.Replace("]", "")}]({msg.JumpLink})");
 
         try
@@ -278,17 +295,46 @@ internal class Stargrid : ModuleBase
             return;
         }
 
+        
+        bool isGif = media?.Frames.Count > 1;
+        // if (isGif)
+        //     ctx.DeferResponseAsync(true)
 
         // Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null
         Image quoteImage = Quoter.Quotify(author, authorName, quote, year, bottomText ?? "", media);
 
         using MemoryStream ms = new();
 
-        await quoteImage.SaveAsPngAsync(ms);
+        if (isGif)
+        {
+            var tempPath = Path.GetTempFileName();
+            await using (var fs = File.OpenWrite(tempPath))
+            {
+                await quoteImage.SaveAsGifAsync(fs, new GifEncoder()
+                {
+                    ColorTableMode = GifColorTableMode.Local,
+                });
+
+                await fs.FlushAsync();
+            }
+
+            GifsicleService gifsicle = new();
+            var res = await gifsicle.RunAsync(tempPath, gifsicleOptions);
+
+            await using (var fs = File.OpenRead(tempPath))
+            {
+                await fs.CopyToAsync(ms);
+            }
+        }
+        else
+        {
+            await quoteImage.SaveAsPngAsync(ms);
+        }
+
         ms.Position = 0;
 
         DiscordInteractionResponseBuilder dirb = new DiscordInteractionResponseBuilder()
-                                        .AddFile("quote.png", ms)
+                                        .AddFile($"quote.{(isGif ? "gif" : "png")}", ms)
                                         .AsEphemeral(true);
 
         try

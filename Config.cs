@@ -11,11 +11,12 @@ using Tomlet.Attributes;
 
 namespace BoneBoard;
 
+[SuppressMessage("ReSharper", "InconsistentNaming")]
 internal class Config
 {
     public static event Action? ConfigChanged;
 
-    // public static Config values;
+    public static Config values;
     private const string CFG_PATH = "./config.toml";
     internal string token = "";
     public string logPath = "./logs/";
@@ -133,6 +134,8 @@ internal class Config
     [TomlPrecedingComment("Code looks for a JSON-like '\"on_topic\": true', so make sure your prompt is a JSON object or otherwise includes that string")]
     public string wikiTopicSystemPrompt = "You are a bot that analyzes user messages and determines if they are relevant to a given Wikipedia topic. You have access to the Wikipedia article's content and must use it to assess relevance. Respond with a JSON object with the following fields\n'reasoning': A concise explanation of your thought process and the connection between the message and the topic.\n'on_topic': A boolean. True if the message is on topic, false if it's off topic.";
 
+    public List<ulong> channelsWhereBotReimplementsSlowmode = new();
+    
     static Config()
     {
         Console.WriteLine("Initializing config");

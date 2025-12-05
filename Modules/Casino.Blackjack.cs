@@ -5,7 +5,6 @@ using DSharpPlus.Commands;
 using DSharpPlus.Commands.ArgumentModifiers;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
-using Skeleton;
 
 namespace BoneBoard.Modules;
 
@@ -145,7 +144,7 @@ internal partial class Casino
         MatchTheDealer
     }
     
-    private static SideBet[] allSideBets = Enum.GetValues<SideBet>();
+    private static readonly SideBet[] allSideBets = Enum.GetValues<SideBet>();
 
     private static Dictionary<SideBet, DescriptionAttribute> SideBetDescriptions = typeof(SideBet).GetFields().Where(fi => fi.IsStatic)
         .ToDictionary(fi => (SideBet)fi.GetValue(null)!, fi => fi.GetCustomAttributes<DescriptionAttribute>().First());
@@ -366,7 +365,7 @@ internal partial class Casino
                     1 => 2,
                     2 => 25,
                     3 => 200,
-                    _ => 69 // lol
+                    _ => SIDE_BET_FAILED // lol
                 };
             }
         },
@@ -879,7 +878,7 @@ internal partial class Casino
                     SIDE_BET_INAPPLICABLE => $"this text shouldnt appearrrrrrr!!! (past evals {pastEval}, curr eval {currentEval})",
                     _ => $"Won {(int)Math.Round(displayEval*amount)} points!"
                 };
-                sb.AppendLine($"**{name}**: {evalString}");
+                sb.AppendLine($"-# **{name}**: {evalString}");
             }
         }
 

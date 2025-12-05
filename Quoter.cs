@@ -11,7 +11,8 @@ using SixLabors.ImageSharp.Processing;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using Skeleton;
+using SixLabors.ImageSharp.Formats.Gif;
+using StableCube.Media.Gifsicle;
 
 namespace BoneBoard;
 
@@ -233,8 +234,7 @@ internal static partial class Quoter
                 //    {
                 //        remap -= pastBound.Codepoint.Utf16SequenceLength - 1;
                 //    }
-
-
+                
                 //    var bounds = allGlyphs[indices[i] + remap];
                 //    var emoji = emojis[i]!;
                 //    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
@@ -456,12 +456,107 @@ internal static partial class Quoter
     }
 
     public delegate void GlyphReplacer((Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) quoteImages, ReadOnlySpan<GlyphBounds> allGlyphs, FontRectangle textblockBounds, int lineCount);
-    public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
+
+    public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null,
+        int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
+    {
+        if (media is null || media.Frames.Count == 1)
+        {
+            return QuotifyFrame(pfp, name, quote, year, extraText, media, width, height,
+                pfpSize, glyphReplacer);
+        }
+        else
+        {
+            return QuotifyAnimated(pfp, name, quote, year, extraText, media, width, height,
+                pfpSize, glyphReplacer);
+        }
+    }
+    
+    public static Image QuotifyAnimated(Image pfp, string name, string quote, int year, string extraText,
+        Image media, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
+    {
+        Image outputGif = QuotifyFrame(pfp, name, quote, year, extraText, media, width, height, pfpSize,
+            glyphReplacer);
+        outputGif.Metadata.GetGifMetadata().RepeatCount = 0;
+        outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay
+            = media.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+        
+#if false
+        ImageFrame[] frames = new ImageFrame[media.Frames.Count];
+        var loopRes = Parallel.For(0, media.Frames.Count, (i, state) =>
+        {
+            Logger.Put($"Working on frame idx {i} (of {media.Frames.Count})");
+            // this is inefficient as FUCK but i DONT CARE!!!!!
+            Image frameColor = QuotifyFrame(pfp, name, quote, year, extraText, media.Frames.ExportFrame(i), width,
+                height,
+                pfpSize, glyphReplacer);
+
+            var delayTime = media.Frames[i].Metadata.GetGifMetadata().FrameDelay;
+            var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
+            newFrameMetadata.FrameDelay = delayTime;
+
+            // outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
+            frames[i] = frameColor.Frames.RootFrame;
+        });
+
+        while (!loopRes.IsCompleted)
+        {
+        }
+
+        foreach (var frame in frames)
+        {
+            outputGif.Frames.AddFrame(frame);
+        }
+#else
+        
+        // for (int i = media.Frames.Count - 1; i >= 0; i--)
+        // for (int i = 0; i < media.Frames.Count; i++)
+        while (media.Frames.Count > 1)
+        {
+            int i = 0;
+            // this is inefficient as FUCK but i DONT CARE!!!!!
+            Image currFrame = media.Frames.ExportFrame(i);
+            Image frameColor = QuotifyFrame(pfp, name, quote, year, extraText, currFrame, width, height, pfpSize,
+                glyphReplacer);
+
+             
+            var delayTime = currFrame.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+            
+            // first frame is a bitch and makes me want to kill my self.
+            // if (outputGif.Frames.Count == 1)
+            // {
+            //     outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = delayTime;
+            //     // outputGif.Frames.RootFrame.Metadata.GetGifMetadata().DisposalMethod =
+            //     //     GifDisposalMethod.RestoreToBackground;
+            //     // ImageBrush brush = new ImageBrush(frameColor);
+            //     outputGif.Mutate(x => x.DrawImage(frameColor, 1));
+            //     // outputGif.
+            //     continue;
+            // }
+
+            var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
+            // newFrameMetadata.DisposalMethod = GifDisposalMethod.NotDispose;
+            newFrameMetadata.FrameDelay = delayTime;
+
+            // outputGif.Frames.InsertFrame(0, frameColor.Frames.RootFrame);
+            outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
+            // if (i == 0)
+            //     outputGif.Frames.RemoveFrame(0);
+        }
+#endif
+
+        // first frame is blank from creation. remove it.
+        // outputGif.Frames.RemoveFrame(0);
+        return outputGif;
+    }
+
+    public static Image QuotifyFrame(Image pfp, string name, string quote, int year, string extraText, Image? media = null,
+        int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
     {
         name = name.Replace("\n", " ").Trim();
         quote = "\"" + quote + "\"";
         int pfpDistToTop = (height - pfpSize) / 2;
-        float marginY = height * 0.25f, marginX = 50, bottomToPfpMargin = (height - pfpSize) / 2;
+        float marginY = height * 0.25f, marginX = 50, bottomToPfpMargin = (height - pfpSize) / 2f;
         const float NAME_FONT_SIZE = 36;
 
 

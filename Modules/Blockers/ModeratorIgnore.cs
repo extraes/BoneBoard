@@ -13,7 +13,6 @@ using System.Diagnostics;
 using DSharpPlus.Commands.ContextChecks;
 using System.ComponentModel;
 using DSharpPlus;
-using Skeleton;
 
 namespace BoneBoard.Modules.Blockers;
 

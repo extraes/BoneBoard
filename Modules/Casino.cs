@@ -12,7 +12,6 @@ using System.ComponentModel;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.MessageCommands;
 using DSharpPlus.Commands.Trees.Metadata;
-using Skeleton;
 
 namespace BoneBoard.Modules;
 
@@ -137,8 +136,7 @@ internal partial class Casino : ModuleBase
 
                 string emojis = slotMachineEmojis.Random() + " " + slotMachineEmojis.Random() + " " + slotMachineEmojis.Random();
                 builder.WithContent("Rolling...\n" + emojis);
-
-
+                
                 if (amountGambled > PersistentData.values.casinoPoints[ctx.User.Id])
                 {
                     builder.WithContent("https://tenor.com/view/money-wallet-broke-gif-7855913");
@@ -148,7 +146,6 @@ internal partial class Casino : ModuleBase
 
                 await ctx.EditFollowupAsync(followup.Id, builder);
             }
-
 
             await Task.Delay(2000);
 

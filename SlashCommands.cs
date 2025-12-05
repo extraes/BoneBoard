@@ -31,8 +31,7 @@ internal class SlashCommands
             await ctx.RespondAsync("nuh uh", true);
             return true;
         }
-
-        BotConfig.
+        
         if (ownerOnly && !Config.values.owners.Contains(ctx.Member.Id))
         {
             await ctx.RespondAsync("nop", true);
@@ -152,6 +151,46 @@ internal class SlashCommands
         await BoneBot.Bots[ctx.Client].msgBuffer.SendBufferedMessages();
 
         var builder = new DiscordFollowupMessageBuilder().WithContent("Flushed buffered messages in all servers 👍.");
+        await ctx.FollowupAsync(builder);
+    }
+    
+    [Command("baltop"), Description("Prints out the people with the fattest pockets.")]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public static async Task BalTop(SlashCommandContext ctx)
+    {
+        if (await ModGuard(ctx))
+            return;
+
+        await ctx.DeferResponseAsync(true);
+
+        StringBuilder sb = new();
+        sb.AppendLine("# Monopoly Men");
+        foreach (var kvp in PersistentData.values.casinoPoints.OrderBy(kvp => kvp.Value))
+        {
+            if (sb.Length > 1800)
+                break;
+            string username = "[Someone not found]";
+            try
+            {
+                var member = await ctx.Guild!.GetMemberAsync(kvp.Key);
+                username = member.Username;
+            }
+            catch { }
+            sb.AppendLine($"**{username}** (<@{kvp.Key}>): {kvp.Value:N}");
+        }
+
+        var allBalances = PersistentData.values.casinoPoints.Values
+            .ToList();
+        allBalances.Sort();
+        int firstOver5k = allBalances.FindIndex(b => b > 5000);
+        int countOver5k = allBalances.Count - firstOver5k;
+        
+        sb.AppendLine("# Stats");
+        sb.AppendLine($"~Median (over 5k points): {allBalances[firstOver5k + countOver5k / 2]}");
+        sb.AppendLine($"~Median (all): {allBalances[allBalances.Count / 2]}");
+
+        var builder = new DiscordFollowupMessageBuilder().WithContent(sb.ToString());
         await ctx.FollowupAsync(builder);
     }
 }

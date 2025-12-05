@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Skeleton;
 using Tomlet;
 using Tomlet.Attributes;
 
@@ -42,6 +41,12 @@ internal class PersistentData
 
     public Dictionary<ulong, int> casinoPoints = new(); // user id -> points
 
+    public Dictionary<ulong, Dictionary<ulong, ulong>> lastReslowedMessages = new(); // channel id -> user id -> message id
+    public Dictionary<ulong, Dictionary<ulong, DateTime>> ignoreReslowingUntil = new(); // channel id -> user id -> expiry time
+
+    public string predictionBoardLink = "";
+    public List<Modules.PredictionEvent> predictionEvents = new();
+    
     static PersistentData()
     {
         Console.WriteLine("Initializing persistent data storage");

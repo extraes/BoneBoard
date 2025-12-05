@@ -11,10 +11,11 @@ using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using DSharpPlus.Commands.Trees;
 
 namespace BoneBoard;
 
-internal class BoneBot : ISklie
+internal class BoneBot
 {
 
     public static Dictionary<DiscordClient, BoneBot> Bots { get; } = new();
@@ -28,7 +29,8 @@ internal class BoneBot : ISklie
     internal MessageBuffer msgBuffer;
     internal ImageRoyale imageRoyale;
     internal VideoRoyale videoRoyale;
-
+    internal Reslow reslow;
+    
     internal DiscordClientBuilder clientBuilder;
     internal DiscordClient client;
     DiscordUser User => client.CurrentUser;
@@ -72,37 +74,63 @@ internal class BoneBot : ISklie
         SlashCommandProcessor scp = new();
         MessageCommandProcessor mcp = new();
 
-        // blockers =
-        // [
-        //     new ModeratorIgnore(this),
-        //     new CustomEmojisAndStickers(this),
-        //     new FlagRestriction(this),
-        //     new WordPercentage(this),
-        //     new NoVowels(this),
-        //     new SheOnMyTill(this),
-        //     new Haiku(this),
-        //     new WikiTopic(this),
-        // ];
+        blockers =
+        [
+            new ModeratorIgnore(this),
+            new CustomEmojisAndStickers(this),
+            new FlagRestriction(this),
+            new WordPercentage(this),
+            new NoVowels(this),
+            new SheOnMyTill(this),
+            new Haiku(this),
+            new WikiTopic(this),
+            new Reslow(this),
+        ];
         casino = new(this);
-        // hangman = new(this);
-        // frogRole = new(this);
-        // confessions = new(this);
-        // stargrid = new(this);
-        // msgBuffer = new(this);
-        // imageRoyale = new(this);
-        // videoRoyale = new(this);
-
+        hangman = new(this);
+        frogRole = new(this);
+        confessions = new(this);
+        stargrid = new(this);
+        msgBuffer = new(this);
+        imageRoyale = new(this);
+        videoRoyale = new(this);
+        
+        IEnumerable<Type> commandTypes = new[] { typeof(SlashCommands) }
+            .Concat(ModuleBase.AllModules.Select(m => m.GetType())
+                .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null));
+        
+        // IEnumerable<CommandBuilder> commandBuilders = new[] { typeof(SlashCommands) }
+        //     .Concat(ModuleBase.AllModules.Select(m => m.GetType())
+        //         .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null))
+        //     .Select(CommandBuilder.From);
+        //
+        // clientBuilder.ConfigureEventHandlers(x =>
+        //     /* Discord's docs state:
+        //      * "When connecting to the gateway as a bot user, guilds that the bot is a part of will start out as
+        //      * unavailable. [...] As guilds become available to you, you will receive Guild Create events."
+        //      */
+        //     x.HandleGuildCreated(async (client, args) =>
+        //     {
+        //         foreach (var command in commandBuilders.SelectMany(cb => cb.Flatten()).Select(cb => cb.Build()))
+        //         {
+        //             args.Guild.CreateApplicationCommandAsync(command);
+        //                 
+        //         }
+        //         args.Guild.BulkOverwriteApplicationCommandsAsync()
+        //     })
+        // );
+        //
+        // DSharpPlus.Commands.Trees.CommandBuilder.From()
         clientBuilder.UseCommands((isp, ce) =>
         {
-            IEnumerable<Type> commands = new[] { typeof(SlashCommands) }
-                                            .Concat(ModuleBase.AllModules.Select(m => m.GetType()).Where(t => t.GetCustomAttribute<CommandAttribute>() is not null));
             ce.AddProcessors(scp, mcp);
-            ce.AddCommands(commands);
+            ce.AddCommands(commandTypes);
             ce.CommandErrored += CommandErrorHandler;
         }, new()
         {
             RegisterDefaultCommandProcessors = false,
             UseDefaultCommandErrorHandler = false, // annoying fuck
+            
         });
 
         client = clientBuilder.Build();
