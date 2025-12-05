@@ -177,7 +177,7 @@ internal class SlashCommands
                 username = member.Username;
             }
             catch { }
-            sb.AppendLine($"**{username}** (<@{kvp.Key}>): {kvp.Value:N}");
+            sb.AppendLine($"**{username}** (<@{kvp.Key}>): {kvp.Value:N0}");
         }
 
         var allBalances = PersistentData.values.casinoPoints.Values

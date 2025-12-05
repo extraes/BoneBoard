@@ -99,13 +99,13 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
             return;
         }
         
-        if (hours > 1)
+        if (hours < 1)
         {
             await ctx.RespondAsync("You can't buy less than an hour of ignorance.", true);
             return;
         }
 
-        if (hours < 6)
+        if (hours > 6)
         {
             await ctx.RespondAsync("You can't buy more than 6 hours of ignorance", true);
             return;
