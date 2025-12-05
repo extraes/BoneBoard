@@ -350,7 +350,7 @@ internal partial class Casino
             : 0;
         
         bool bettingAgainstSelf = currPosition.HasValue && currPosition.Value != willItHappen;
-        bool needToScavengePrevBets = bettingAgainstSelf && overridePrevBets;
+        bool needToScavengePrevBets = overridePrevBets;
         if (needToScavengePrevBets)
         {
             int scavenged = 0;
@@ -361,6 +361,7 @@ internal partial class Casino
             scavenged += val;
 
             balance += scavenged;
+            currPosAmt = 0;
         }
         else if (bettingAgainstSelf)
         {
