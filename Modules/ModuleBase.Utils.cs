@@ -13,6 +13,26 @@ namespace BoneBoard.Modules;
 internal partial class ModuleBase
 {
     [DebuggerStepThrough]
+    protected async void TryDeleteDontCare(DiscordMessage msg, string? reason = null)
+    {
+        try
+        {
+            if (reason is not null)
+                Logger.Put($"Deleting message {msg} for reason '{reason}'");
+            await msg.DeleteAsync(reason);
+        }
+        catch (DiscordException ex)
+        {
+            //could possibly return it?
+            Logger.Warn($"{GetType().Name} failed to delete message (DiscordException) {msg}", ex);
+        }
+        catch (Exception e)
+        {
+            Logger.Warn($"{GetType().Name} failed to delete message (Unknown exception) {msg}", e);
+        }
+    }
+    
+    [DebuggerStepThrough]
     protected async Task<bool> TryDeleteAsync(DiscordMessage msg, string? reason = null)
     {
         try

@@ -17,21 +17,21 @@ namespace BoneBoard.Modules.Blockers;
 internal class Reslow(BoneBot bot) : ModuleBase(bot)
 {
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return Task.FromResult(MessageCheckAsync(msgCreatedArgs.Message));
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return Task.FromResult(MessageCheckAsync(msgUpdatedArgs.Message));
         }
 
-        return false;
+        return Task.FromResult(false);
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    private bool MessageCheckAsync(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -44,6 +44,9 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
 
         if (msg.Channel is null || msg.Author is not DiscordMember member)
             return false;
+
+        if (!msg.Channel.PerUserRateLimit.HasValue)
+            return false; // channel not ratelimited
 
         if (!msg.Channel.PermissionsFor(member).HasPermission(DiscordPermission.BypassSlowmode))
             return false; // means discord is already handling the slowmode
@@ -73,10 +76,11 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
         {
             var lastTime = lastMsgId.GetSnowflakeTime();
             var now = DateTime.Now;
-            if (lastTime + TimeSpan.FromHours(6) > now) // their last message was sent less than 6h ago
+            // their last message was sent less than (ratelimit) seconds ago
+            if (lastTime + TimeSpan.FromSeconds(msg.Channel.PerUserRateLimit.Value) > now)
             {
                 // delete and block propagation
-                await TryDeleteAsync(msg);
+                TryDeleteDontCare(msg);
                 return true;
             }
 
@@ -89,13 +93,19 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
         return false;
     }
 
-    [Command("ignoreme"), Description("Makes the bot ignore your messages in this channel (for re-slowmode only)")]
+    [Command("ignoreme"), Description("Makes the bot ignore your messages in THIS channel (for re-slowmode only)")]
     [RequireGuild]
     public static async Task Ignore(SlashCommandContext ctx, double hours = 1)
     {
+        if (!ctx.Channel.PerUserRateLimit.HasValue
+            || !Config.values.channelsWhereBotReimplementsSlowmode.Contains(ctx.Channel.Id))
+        {
+            await ctx.RespondAsync("This channel doesn't have a slowmode/bot-implemented slowmode.", true);
+        }
+        
         if (!ctx.Channel.PermissionsFor(ctx.Member!).HasPermission(DiscordPermission.BypassSlowmode))
         {
-            await ctx.RespondAsync("You don't even bypass slowmode in this channel... what?");
+            await ctx.RespondAsync("You don't even bypass slowmode in this channel... what?", true);
             return;
         }
         
@@ -139,10 +149,13 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
         expireAt = DateTime.Now.AddHours(hours);
         userDict[ctx.User.Id] = expireAt;
         PersistentData.WritePersistentData();
+        Logger.Put($"{ctx.User} was charged {price} points for a {hours:0.00} hr slowmode exemption. "
+                   + $"They now have {balance} points");
         
         string respondStr = $"Okay! You'll be noticed again {Formatter.Timestamp(expireAt)}, but until then, post away!";
+        respondStr += $"\n You were charged {price} points for this btw. You now have {balance} points.";
         if (alreadyInvuln)
-            respondStr += "\n-# You were still ignored btw. lol.";
+            respondStr += "\n-# You were also still ignored btw. lol.";
         await ctx.RespondAsync(respondStr, true);
     }
 }

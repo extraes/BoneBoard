@@ -29,7 +29,6 @@ internal class BoneBot
     internal MessageBuffer msgBuffer;
     internal ImageRoyale imageRoyale;
     internal VideoRoyale videoRoyale;
-    internal Reslow reslow;
     
     internal DiscordClientBuilder clientBuilder;
     internal DiscordClient client;
@@ -77,6 +76,7 @@ internal class BoneBot
         blockers =
         [
             new ModeratorIgnore(this),
+            new Reslow(this),
             new CustomEmojisAndStickers(this),
             new FlagRestriction(this),
             new WordPercentage(this),
@@ -84,7 +84,6 @@ internal class BoneBot
             new SheOnMyTill(this),
             new Haiku(this),
             new WikiTopic(this),
-            new Reslow(this),
         ];
         casino = new(this);
         hangman = new(this);

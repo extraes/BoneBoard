@@ -19,6 +19,13 @@ internal abstract partial class ModuleBase
 {
 
     #region Statics
+    
+    //todo: HANDLE EVENT DISPATCHING MYSELF
+    private const int EVENT_BLOCKED = -1;
+
+    private static List<ModuleBase> allBlockers = [];
+
+    private static Dictionary<DiscordEventArgs, int> eventsRanThruBlockers = new();
 
     static ModuleBase()
     {
