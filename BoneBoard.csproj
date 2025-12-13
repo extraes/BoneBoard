@@ -14,6 +14,10 @@
     <Compile Remove="Skeleton\**" />
     <EmbeddedResource Remove="Skeleton\**" />
     <None Remove="Skeleton\**" />
+    <Compile Remove="Relauncher\obj\**" />
+    <EmbeddedResource Remove="Relauncher\obj\**" />
+    <None Remove="Relauncher\obj\**" />
+    <Compile Remove="Relauncher\Program.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />

@@ -9,7 +9,10 @@ using System.Threading.Tasks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using System.Runtime.CompilerServices;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Reflection;
 using DSharpPlus.Commands.ContextChecks;
+using Relauncher;
 
 namespace BoneBoard;
 
@@ -193,4 +196,183 @@ internal class SlashCommands
         var builder = new DiscordFollowupMessageBuilder().WithContent(sb.ToString());
         await ctx.FollowupAsync(builder);
     }
+    
+        [Command("updateRelaunch"), Description("Pulls from git, rebuilds, and then relaunches the bot process")]
+        [RequireApplicationOwner]
+        public async Task PullRelaunch(SlashCommandContext ctx)
+        {
+            if (await ModGuard(ctx))
+                return;
+            
+            await ctx.DeferResponseAsync(true);
+
+            string gitOutput = "";
+            string rootFolder = "";
+            string relauncherPath = "";
+            string dotnetRestoreOutput = "";
+            string dotnetBuildOutput = "";
+            Exception? exception = null;
+
+            Logger.Put($"Pulling from git and then relaunching at the request of {ctx.User.Username}#{ctx.User.Discriminator} (ID={ctx.User.Id})");
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Process proc = new Process()
+                    {
+                        StartInfo = new ProcessStartInfo()
+                        {
+                            FileName = "git",
+                            Arguments = "pull",
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                        },
+                    };
+                    Logger.Put($"Executing command: {proc.StartInfo.FileName} {proc.StartInfo.Arguments}", LogType.Debug);
+                    proc.Start();
+                    proc.WaitForExit();
+                    gitOutput = proc.StandardOutput.ReadToEnd();
+                    Logger.Put($"Output from {proc.StartInfo.FileName} {proc.StartInfo.Arguments}: {gitOutput}", LogType.Debug);
+
+                    proc.StartInfo.Arguments = "rev-parse --show-toplevel";
+                    Logger.Put($"Executing command: {proc.StartInfo.FileName} {proc.StartInfo.Arguments}", LogType.Debug);
+                    proc.Start();
+                    proc.WaitForExit();
+                    rootFolder = proc.StandardOutput.ReadToEnd().TrimEnd();
+                    Logger.Put($"Output from {proc.StartInfo.FileName} {proc.StartInfo.Arguments}: {rootFolder}", LogType.Debug);
+
+                    proc.StartInfo.FileName = "dotnet";
+                    proc.StartInfo.Arguments = "restore";
+                    proc.StartInfo.WorkingDirectory = rootFolder;
+                    Logger.Put($"Executing command: {proc.StartInfo.FileName} {proc.StartInfo.Arguments}", LogType.Debug);
+                    proc.Start();
+                    proc.WaitForExit();
+                    dotnetRestoreOutput = proc.StandardOutput.ReadToEnd();
+                    Logger.Put($"Output from {proc.StartInfo.FileName} {proc.StartInfo.Arguments}: {dotnetRestoreOutput}", LogType.Debug);
+
+                    proc.StartInfo.Arguments = "build \"Relauncher/Relauncher.csproj\"";
+                    Logger.Put($"Executing command: {proc.StartInfo.FileName} {proc.StartInfo.Arguments}", LogType.Debug);
+                    proc.Start();
+                    proc.WaitForExit();
+                    dotnetBuildOutput = proc.StandardOutput.ReadToEnd();
+                    Logger.Put($"Output from {proc.StartInfo.FileName} {proc.StartInfo.Arguments}: {dotnetBuildOutput}", LogType.Debug);
+                    // trying to get line: "  Voidway Bot Relauncher -> C:\Users\extraes\source\repos\Voidway-Bot\Relauncher\bin\Debug\net7.0\Voidway Bot Relauncher.dll"
+                    // and stop before line: "Build succeeded."
+                    relauncherPath = dotnetBuildOutput.Replace("\r\n", "\n").Split('>')[1].Split("\n\n")[0].Trim().Replace("\n  ", "");
+                    if (OperatingSystem.IsWindows())
+                        relauncherPath = Path.ChangeExtension(relauncherPath, "exe");
+                    else
+                        relauncherPath = Path.ChangeExtension(relauncherPath, null).TrimEnd('.');
+
+                    Logger.Put($"Found relauncher path to be {relauncherPath}", LogType.Debug);
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+            });
+
+
+            Assembly? entryPoint = Assembly.GetEntryAssembly();
+            if (entryPoint is null)
+            {
+                Logger.Error("Error while attempting to start new bot process", new EntryPointNotFoundException("This process has no executable/executing assembly! This is not allowed!"));
+                DiscordWebhookBuilder bldr = new()
+                {
+                    Content = "Unable to find entry-point of current process.",
+                };
+                await ctx.EditResponseAsync(bldr);
+                return;
+            }
+
+            StringBuilder outputMessage = new();
+
+            gitOutput = gitOutput.TrimEnd();
+            dotnetRestoreOutput = dotnetRestoreOutput.TrimEnd();
+            dotnetBuildOutput = dotnetBuildOutput.TrimEnd();
+
+            if (string.IsNullOrEmpty(gitOutput))
+            {
+                outputMessage.AppendLine("Unable to pull from git remote. ");
+                if (exception is not null)
+                    outputMessage.Append(exception.ToString());
+                goto SENDMESSAGE;
+            }
+            else outputMessage.AppendLine($"Git pull results:\n{gitOutput}");
+
+            if (string.IsNullOrEmpty(dotnetRestoreOutput))
+            {
+                outputMessage.AppendLine("Unable to run `dotnet restore`. ");
+                if (exception is not null)
+                    outputMessage.Append(exception.ToString());
+                goto SENDMESSAGE;
+            }
+            else outputMessage.AppendLine($"Results of `dotnet restore`:\n{dotnetRestoreOutput}");
+
+            if (string.IsNullOrEmpty(dotnetBuildOutput))
+            {
+                outputMessage.AppendLine("Unable to get remote-to-local commit diff names. ");
+                if (exception is not null)
+                    outputMessage.Append(exception.ToString());
+                goto SENDMESSAGE;
+            }
+            else outputMessage.AppendLine($"Results of `dotnet build` for relauncher:\n{dotnetBuildOutput}");
+
+            // bro this is such shit code never use labels EVER bruh
+            SENDMESSAGE:
+            DiscordWebhookBuilder dwb = new()
+            {
+                Content = outputMessage.ToString(),
+            };
+            await ctx.EditResponseAsync(dwb);
+
+            if (exception is not null || dotnetBuildOutput.Contains("Build FAILED.")) return;
+
+            Process relauncher = new()
+            {
+                StartInfo = new()
+                {
+                    FileName = relauncherPath,
+                    CreateNoWindow = false
+                }
+            };
+
+            string currExecLocation = entryPoint.Location;
+            if (OperatingSystem.IsWindows()) currExecLocation = Path.ChangeExtension(currExecLocation, "exe");
+            else currExecLocation = Path.ChangeExtension(currExecLocation, null).TrimEnd('.');
+
+            RelaunchParameters parms = new()
+            {
+                buildProject = Path.Combine(rootFolder, "BoneBoard.csproj"),
+                launchWorkingDir = Environment.CurrentDirectory,
+                launchExecutable = currExecLocation,
+                initiatorId = ctx.User.Id,
+            };
+
+            foreach (var parm in parms.BuildLaunchParameters())
+            {
+                relauncher.StartInfo.ArgumentList.Add(parm);
+            }
+            
+            Logger.Put($"Created relauncher process, not yet started. The following command will be ran: {relauncher.StartInfo.FileName} \"{string.Join("\" \"", relauncher.StartInfo.ArgumentList)}\"", LogType.Debug);
+            try 
+            {
+                relauncher.Start();
+            }
+            catch(Exception ex)
+            {
+                Logger.Error("Exception thrown when attempting to start relauncher process, aborting!", ex);
+                DiscordFollowupMessageBuilder dfmb = new()
+                {
+                    Content = "Exception thrown when attempting to start relauncher process, aborting:\n\t" + ex.ToString(),
+                    IsEphemeral = true,
+                };
+                await ctx.FollowupAsync(dfmb);
+                return;
+            }
+
+            Logger.Put("Relauncher process started. The current bot process will now exit.");
+            Environment.Exit(0);
+        }
 }
