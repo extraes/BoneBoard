@@ -61,6 +61,7 @@ public record class RelaunchParameters
     }
     
 #if !RELAUNCHER
+    private static bool sentMessage = false;
     public static void SetupProcessStartMessage(string[] args, DSharpPlus.DiscordClientBuilder clientBuilder)
     {
         BoneBoard.Logger.Put("Launched with arguments...");
@@ -87,6 +88,8 @@ public record class RelaunchParameters
     private static async Task RelaunchThunk(string buildOutput, ulong initiatorId,
         DSharpPlus.DiscordClient client, DSharpPlus.EventArgs.SessionCreatedEventArgs args)
     {
+        if (sentMessage)
+            return;
         try
         {
             var initiator = await client.GetUserAsync(initiatorId);
@@ -104,6 +107,8 @@ public record class RelaunchParameters
         {
             BoneBoard.Logger.Error($"Failed to DM user after relaunching! Initiator ID: {initiatorId}", e);
         }
+
+        sentMessage = true;
     }
 #endif
 }
