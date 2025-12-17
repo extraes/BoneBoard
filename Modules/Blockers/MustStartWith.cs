@@ -36,6 +36,10 @@ internal class MustStartWith : ModuleBase
 
         string checkWordsAgainst = msg.Content.Replace('’', '\'').Replace("'", "");
         bool startsWithNeededString = Config.values.possibleMessageStarts.Any(s => checkWordsAgainst.StartsWith(s, StringComparison.InvariantCultureIgnoreCase));
-        return !startsWithNeededString;
+        if (startsWithNeededString)
+            return false;
+        
+        TryDeleteDontCare(msg, "Doesn't start with any of the needed starters.");
+        return true;
     }
 }
