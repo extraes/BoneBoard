@@ -13,15 +13,15 @@ internal class NoVowels : ModuleBase
 {
     public NoVowels(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
         else if (eventArgs is MessageReactionAddedEventArgs reactionArgs)
         {
@@ -33,14 +33,9 @@ internal class NoVowels : ModuleBase
             if (!Config.values.channelsWhereNoVowelsAreAllowed.Contains(reactionArgs.Channel.Id) || !"aeiou".Contains(regionalIndicator[0], StringComparison.InvariantCultureIgnoreCase))
                 return false;
             
-            try
-            {
-                await reactionArgs.Message.DeleteReactionAsync(reactionArgs.Emoji, reactionArgs.User, "'no vowels' includes writing in reactions. woe.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to delete reaction from {reactionArgs.User}! ", ex);
-            }
+            
+            _ = TryDeleteAsync(reactionArgs.Message, reactionArgs.Emoji, reactionArgs.User,
+                "'no vowels' includes writing in reactions. woe.");
 
             return true;
             
@@ -49,7 +44,7 @@ internal class NoVowels : ModuleBase
         return false;
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    private bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -58,14 +53,7 @@ internal class NoVowels : ModuleBase
 
         if (hasVowelInDisallowedChannel)
         {
-            try
-            {
-                await msg.DeleteAsync("you must not use vowels in this channel. woe.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to delete message from {msg.Author}! ", ex);
-            }
+            TryDeleteDontCare(msg, "you must not use vowels in this channel. woe.");
 
             return true;
         }

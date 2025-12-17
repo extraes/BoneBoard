@@ -33,26 +33,27 @@ internal partial class MessageBuffer : ModuleBase
 
     public MessageBuffer(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
-        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
+        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs && MessageCheck(msgCreatedArgs.Message))
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            Task.Run(() => BufferMessage(msgCreatedArgs.Message));
+
+            return true;
         }
 
         return false;
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage message)
+    private bool MessageCheck(DiscordMessage message)
     {
         DiscordMember? member = message.Author as DiscordMember;
         if (member is null)
             return false;
 
-        bool isBufferExempt = member is not null && member.Roles.Any(r => Config.values.bufferExemptRoles.Contains(r.Id));
+        bool isBufferExempt = member.Roles.Any(r => Config.values.bufferExemptRoles.Contains(r.Id));
         if (PersistentData.values.bufferedChannels.Contains(message.ChannelId) && !isBufferExempt && !bot.IsMe(message.Author))
         {
-            await BufferMessage(message);
             return true;
         }
 

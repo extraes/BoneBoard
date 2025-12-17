@@ -12,21 +12,21 @@ internal class MustStartWith : ModuleBase
 {
     public MustStartWith(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    private bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;

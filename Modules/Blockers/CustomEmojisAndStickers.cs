@@ -12,7 +12,7 @@ internal class CustomEmojisAndStickers : ModuleBase
 {
     public CustomEmojisAndStickers(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageReactionAddedEventArgs rxnArgs)
         {
@@ -21,31 +21,25 @@ internal class CustomEmojisAndStickers : ModuleBase
 
             if (rxnArgs.Emoji.Id == 0)
             {
-                try
-                {
-                    await rxnArgs.Message.DeleteReactionAsync(rxnArgs.Emoji, rxnArgs.User, "this user cant use custom emojis in this channel. woe.");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Failed to delete custom emoji reaction on message from {rxnArgs.User}! ", ex);
-                }
+                _ = TryDeleteAsync(rxnArgs.Message, rxnArgs.Emoji, rxnArgs.User,
+                    "this user cant use custom emojis in this channel. woe.");
 
                 return true;
             }
         }
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -65,15 +59,8 @@ internal class CustomEmojisAndStickers : ModuleBase
 
         if (reason is null)
             return false;
-
-        try
-        {
-            await msg.DeleteAsync(reason);
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"Failed to delete message with custom emoji/sticker from {msg.Author}! ", ex);
-        }
+        
+        TryDeleteDontCare(msg, reason);
         return true;
     }
 

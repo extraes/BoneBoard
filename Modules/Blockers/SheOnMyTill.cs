@@ -13,21 +13,21 @@ internal class SheOnMyTill : ModuleBase
 {
     public SheOnMyTill(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs mcea)
         {
-            return await MessageCheckAsync(mcea.Message);
+            return MessageCheck(mcea.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs muea)
         {
-            return await MessageCheckAsync(muea.Message);
+            return MessageCheck(muea.Message);
         }
 
         return false;
     }
 
-    protected async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    protected bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -49,7 +49,7 @@ internal class SheOnMyTill : ModuleBase
             {
                 string fullFormat = string.Join(" [...] ", Config.values.theFormatInQuestion);
 
-                await TryDeleteAsync(msg, $"Does not conform to {fullFormat}");
+                TryDeleteDontCare(msg, $"Does not conform to {fullFormat}");
                 return true;
             }
 

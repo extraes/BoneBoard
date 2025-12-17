@@ -86,22 +86,22 @@ internal partial class WikiTopic : ModuleBase
         }
     }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
-        {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+        { 
+            _ = MessageCheckAsync(msgCreatedArgs.Message, eventArgs);
         }
         
         if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            _ = MessageCheckAsync(msgUpdatedArgs.Message, eventArgs);
         }
 
         return false;
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    private async Task<bool> MessageCheckAsync(DiscordMessage msg, DiscordEventArgs args)
     {
         if (bot.IsMe(msg.Author) || msg.Author is null)
             return false;
@@ -152,6 +152,7 @@ internal partial class WikiTopic : ModuleBase
                 Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", LogType.Normal, cleanMultiline: false);
                 whyAUsersMessageWasDeleted[msg.Author.Id] = $"Beamed for the following:```\n{content.Replace("```", "'''")}```{part.Text}";
                 await TryDeleteAsync(msg, "Off topic");
+                DontPropagateEvent(args);
                 return true;
             }
         }

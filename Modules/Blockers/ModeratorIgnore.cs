@@ -38,7 +38,7 @@ internal class ModeratorIgnore : ModuleBase
     public ModeratorIgnore(BoneBot bot) : base(bot) { }
     static Dictionary<DiscordUser, IgnoreData> ignoreCounts = new();
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         timeWasted.Start();
         DiscordUser? user = GetUser(eventArgs);

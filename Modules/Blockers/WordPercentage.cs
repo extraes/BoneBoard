@@ -12,21 +12,21 @@ internal class WordPercentage : ModuleBase
 {
     public WordPercentage(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    static async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    bool MessageCheck(DiscordMessage msg)
     {
         if (msg.Channel is null || !Config.values.channelsWhereMessagesMustHaveMinPercOfAWord.Contains(msg.Channel.Id))
         {
@@ -35,14 +35,8 @@ internal class WordPercentage : ModuleBase
 
         if (WordPercentageIsTooLow(msg.Content))
         {
-            try
-            {
-                await msg.DeleteAsync("you must use more of the designated words in this channel. woe.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to delete message from {msg.Author}! ", ex);
-            }
+            
+            TryDeleteDontCare(msg, "you must use more of the designated words in this channel. woe.");
 
             return true;
         }

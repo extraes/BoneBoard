@@ -13,7 +13,7 @@ internal class FlagRestriction : ModuleBase
 {
     public FlagRestriction(BoneBot bot) : base(bot) { }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageReactionAddedEventArgs rxnArgs)
         {
@@ -25,31 +25,26 @@ internal class FlagRestriction : ModuleBase
                 // this is gonna stop things that are custom emojis with flag_ in them, but that's a small price to pay (and also the white flag)
                 if (rxnArgs.Emoji.Id == 0 && rxnArgs.Emoji.GetDiscordName().Contains("flag_") && !allowedFlags.Contains(rxnArgs.Emoji.Name))
                 {
-                    try
-                    {
-                        await rxnArgs.Message.DeleteReactionAsync(rxnArgs.Emoji, rxnArgs.User, "you must rep the right flag in this channel. woe.");
-                        return true;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn($"Failed to delete custom emoji reaction on message from {rxnArgs.User}! ", ex);
-                    }
+
+                    _ = TryDeleteAsync(rxnArgs.Message, rxnArgs.Emoji, rxnArgs.User,
+                        "you must rep the right flag in this channel. woe.");
+                    return true;
                 }
             }
         }
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageFlagCheck(msgCreatedArgs.Message);
+            return MessageFlagCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageFlagCheck(msgUpdatedArgs.Message);
+            return MessageFlagCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    private async Task<bool> MessageFlagCheck(DiscordMessage msg)
+    private bool MessageFlagCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -61,14 +56,8 @@ internal class FlagRestriction : ModuleBase
 
         if (ContainsDisallowedFlag(msg.Content, allowedFlags))
         {
-            try
-            {
-                await msg.DeleteAsync("you must rep the right flag in this channel. woe.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to delete message with flag emoji from {msg.Author}! ", ex);
-            }
+
+            TryDeleteDontCare(msg, "you must rep the right flag in this channel. woe.");
 
             return true;
         }

@@ -28,21 +28,21 @@ internal class Haiku : ModuleBase
     OpenAIClient? openAiClient;
     static Dictionary<ulong, string> reasoningTraces = new Dictionary<ulong, string>();
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return await MessageCheckAsync(msgCreatedArgs.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return await MessageCheckAsync(msgUpdatedArgs.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    private async Task<bool> MessageCheckAsync(DiscordMessage msg)
+    private bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
@@ -57,27 +57,15 @@ internal class Haiku : ModuleBase
         if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId))
             return false;
 
-
-        if (openAiClient is null)
-        {
-            if (string.IsNullOrEmpty(Config.values.openAiToken))
-                return false;
-            else
-                openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
-        }
-
         // do quick check for haiku
         string[] lines = content.Split('\n');
         if (lines.Length < 3)
         {
-            await TryDeleteAsync(msg, "message not haiku | ancient japan memory | experience woe.");
+            TryDeleteDontCare(msg, "message not haiku | ancient japan memory | experience woe.");
             reasoningTraces[msg.Id] = "Less than 3 lines";
             Logger.Put($"not 3 lines '{content}' -- lines length = {lines.Length}");
             return true;
         }
-
-        var clint = openAiClient.GetOpenAIResponseClient(Config.values.haikuAiModel);
-        var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
 
         // determine if the haiku is reused
         string line1 = CleanString(lines[0]);
@@ -87,9 +75,11 @@ internal class Haiku : ModuleBase
         string haikuSerialize = line1 + line2 + line3;
         ulong authorId = msg.Author?.Id ?? 0;
         // exempt owners bc it could contain a dev whos testing shit
-        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId) && !msg.IsEdited /* editing a valid message shouldnt result in deletion */)
+        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId) &&
+            !msg.IsEdited /* editing a valid message shouldnt result in deletion */)
         {
-            await TryDeleteAsync(msg, "the works of others | the blood, sweat, tears poured in them | are not yours to take");
+            TryDeleteDontCare(msg,
+                "the works of others | the blood, sweat, tears poured in them | are not yours to take");
             reasoningTraces[msg.Id] = "haiku already posted";
             return true;
         }
@@ -98,6 +88,23 @@ internal class Haiku : ModuleBase
         PersistentData.values.usedHaikus.Add(haikuSerialize);
         PersistentData.WritePersistentData();
 
+        _ = Task.Run(() => DetermineHaikuAsync(msg, content));
+        return false;
+    }
+    
+    async Task DetermineHaikuAsync(DiscordMessage msg, string content)
+    {
+        string[] lines = content.Split('\n');
+        if (openAiClient is null)
+        {
+            if (string.IsNullOrEmpty(Config.values.openAiToken))
+                return;
+            else
+                openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
+        }
+        
+        var clint = openAiClient.GetOpenAIResponseClient(Config.values.haikuAiModel);
+        var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
         // determine effort first because 4o is a cheaper, non-reasoning model, lol
         ChatMessage[] messages =
         [
@@ -128,7 +135,8 @@ internal class Haiku : ModuleBase
                         {
                             Logger.Warn($"Exception while timing out the author of a shit haiku ({msg.Author})", ex);
                         }
-                        return true;
+                        // too late to mark the 
+                        return;
                     }
                     break;
                 default:
@@ -153,7 +161,7 @@ internal class Haiku : ModuleBase
             Logger.Warn($"Generating OpenAI syllable analysis failed: Code {response.Value.Error.Code} -- {response.Value.Error.Message}");
             Logger.Warn($"The above error was thrown for the following content: {content}");
 
-            return false;
+            return;
         }
 
         Logger.Put("Raw pipeline response: " + response.GetRawResponse().Content.ToString(), LogType.Debug);
@@ -187,7 +195,7 @@ internal class Haiku : ModuleBase
                             break;
                         case ResponseContentPartKind.Refusal:
                             Logger.Warn($"LLM refused to analyze message {msg.JumpLink}");
-                            return false;
+                            return;
                     }
                 }
 
@@ -205,12 +213,10 @@ internal class Haiku : ModuleBase
 
         if (!llmSyllableCounts.SequenceEqual([5, 7, 5]))
         {
-            await TryDeleteAsync(msg, $"message not haiku | lines do not make 5-7-5 | experience woe.");
-            return true;
+            TryDeleteDontCare(msg, $"message not haiku | lines do not make 5-7-5 | experience woe.");
         }
 
-        // if we got here, the message is a haiku
-        return false;
+        // yaaaayyyy, the message is a haiku
     }
 
     [Command("latestReasonings"), Description("Gets latest reasonings fragments")]

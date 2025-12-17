@@ -52,20 +52,13 @@ internal partial class Hangman : ModuleBase
         //});
     }
 
-    protected override async Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
             if (IsHangmanGuess(msgCreatedArgs.Message))
             {
-                try
-                {
-                    await HandleHangman(bot.client, msgCreatedArgs);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn("Exception while handling hangman guess", ex);
-                }
+                Task.Run(() => HandleHangman(bot.client, msgCreatedArgs));
                 return true;
             }
         }

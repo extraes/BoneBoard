@@ -17,21 +17,21 @@ namespace BoneBoard.Modules.Blockers;
 internal class Reslow(BoneBot bot) : ModuleBase(bot)
 {
 
-    protected override Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return Task.FromResult(MessageCheckAsync(msgCreatedArgs.Message));
+            return MessageCheck(msgCreatedArgs.Message);
         }
         else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return Task.FromResult(MessageCheckAsync(msgUpdatedArgs.Message));
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
-        return Task.FromResult(false);
+        return false;
     }
 
-    private bool MessageCheckAsync(DiscordMessage msg)
+    private bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;

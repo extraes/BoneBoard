@@ -19,6 +19,9 @@ internal abstract partial class ModuleBase
 {
 
     #region Statics
+
+    protected const bool STOP_EVENT_PROPAGATION = true;
+    protected const bool DONT_STOP_EVENT_PROPAGATION = true;
     
     //todo: HANDLE EVENT DISPATCHING MYSELF
     private const int EVENT_BLOCKED = -1;
@@ -100,7 +103,7 @@ internal abstract partial class ModuleBase
         else if (args is MessageReactionAddedEventArgs rxnArgs)
             needStop = needStop || Config.values.blockedUsers.Contains(rxnArgs.User.Id);
 
-        needStop = needStop || await GlobalStopEventPropagation(args);
+        needStop = needStop || GlobalStopEventPropagation(args);
 
         if (needStop)
         {
@@ -139,9 +142,9 @@ internal abstract partial class ModuleBase
     }
 
     // actual API shit that children are gonna use
-    protected virtual Task<bool> GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    protected virtual bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
-        return Task.FromResult(false);
+        return false;
     }
 
     protected virtual Task InitOneShot(GuildDownloadCompletedEventArgs args)
