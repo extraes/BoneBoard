@@ -323,7 +323,7 @@ internal class SlashCommands
             SENDMESSAGE:
             DiscordWebhookBuilder dwb = new()
             {
-                Content = outputMessage.ToString(),
+                Content = Logger.EnsureShorterThan(outputMessage.ToString(), 2000, "\n[cutoff for discord]"),
             };
             await ctx.EditResponseAsync(dwb);
 
