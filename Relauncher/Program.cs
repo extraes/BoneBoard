@@ -8,14 +8,14 @@ class Program
     {
         Thread.Sleep(1000); // make sure parent process is dead
         
-        var parms = RelaunchParameters.Parse(args);
+        var parms = RelaunchParameters.Parse(args)!;
         // string buildProject = args.First(arg => arg.StartsWith("BUILD=")).Replace("BUILD=", ""); // full path
         // string continueWith = args.First(arg => arg.StartsWith("CONT=")).Replace("CONT=", ""); // full path
         // string continueRootFolder = args.First(arg => arg.StartsWith("PWD=")).Replace("PWD=", "");
         // string? initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID=")); // optional
 
         string projFolder = Path.GetDirectoryName(parms.buildProject) ?? Environment.CurrentDirectory;
-        string projFile = Path.GetFileName(parms.buildProject);
+        string projFile = Path.GetFileName(parms.buildProject)!;
         string dotnetBuildOutput;
 
         Process proc = new()
