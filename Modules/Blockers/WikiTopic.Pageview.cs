@@ -12,6 +12,7 @@ internal partial class WikiTopic
 {
     public class PageviewsResponse
     {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
         public PageviewItem[] items { get; set; }
     }
 
@@ -24,6 +25,7 @@ internal partial class WikiTopic
         public string access { get; set; }
         public string agent { get; set; }
         public int views { get; set; }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
     }
 
     public class PageviewResponseParser : WikiResponseMessageParser<PageviewsResponse>

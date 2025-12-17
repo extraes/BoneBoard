@@ -24,6 +24,7 @@ internal abstract partial class ModuleBase
     private ModuleBase()
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
     {
+        GuildDownloadCompletedEvent =   async (c, a) => { if (!DontPropagate.Contains(a)) await GuildDownloadCompleted(c, a);         };
         MessageCreatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await MessageCreated(c, a);         };
         MessageUpdatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await MessageUpdated(c, a);         };
         ReactionAddedEvent =            async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionAdded(c, a);          };
