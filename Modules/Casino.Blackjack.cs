@@ -931,4 +931,21 @@ internal partial class Casino
 
         await BoneBot.Bots[ctx.Client].casino.BeginBlackjack(ctx, amount, zippedBets, false);
     }
+
+    private static readonly string sideBetExplanation =
+        string.Join(
+            "\n",
+            allSideBets.Select(sb =>
+            {
+                var metadata = SideBetMetadatas[sb];
+                var desc = SideBetDescriptions[sb];
+                return $"- **{metadata.Name}**: {desc}\n  -# {metadata.Description}";
+            })
+        );
+    
+    [Command("explainSideBets")]
+    public static async Task ExplainSideBets(SlashCommandContext ctx)
+    {
+        await ctx.RespondAsync(sideBetExplanation, true);
+    }
 }
