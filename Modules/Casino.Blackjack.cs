@@ -939,7 +939,7 @@ internal partial class Casino
             {
                 var metadata = SideBetMetadatas[sb];
                 var desc = SideBetDescriptions[sb];
-                return $"- **{metadata.Name}**: {desc}\n  -# {metadata.Description}";
+                return $"- **{metadata.Name}**: {desc.Description}\n  -# {metadata.Description}";
             })
         );
     
