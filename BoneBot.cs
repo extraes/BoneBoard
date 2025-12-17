@@ -81,6 +81,7 @@ internal class BoneBot
             new Reslow(this),
             new CustomEmojisAndStickers(this),
             new FlagRestriction(this),
+            new MustStartWith(this),
             new WordPercentage(this),
             new NoVowels(this),
             new SheOnMyTill(this),
