@@ -375,4 +375,22 @@ internal class SlashCommands
             Logger.Put("Relauncher process started. The current bot process will now exit.");
             Environment.Exit(0);
         }
+
+
+        [Command("getLogs")]
+        [Description("Returns the last logs that'll fit in ~2000 characters")]
+        [RequireApplicationOwner]
+        public async Task GetLogs(SlashCommandContext ctx, bool reverse)
+        {
+            StringBuilder sb = new();
+            var collection = reverse ? Logger.logStatements.Reverse() : Logger.logStatements; 
+            foreach (var nextStr in collection)
+            {
+                if (sb.Length + nextStr.Length > 1990)
+                    break;
+                sb.AppendLine(nextStr);
+            }
+            
+            await ctx.RespondAsync(sb.ToString(), true);
+        }
 }
