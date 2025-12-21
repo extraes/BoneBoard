@@ -166,7 +166,7 @@ internal class BoneBot
     {
         int randomNumber = Random.Shared.Next();
         Logger.Error($" [{randomNumber}] Exception while executing command on command object {args.CommandObject}", args.Exception);
-        string userResponse = $"Exception while running your command! Tell the host/developer to look for {randomNumber} in the log!\n{args.Exception}";
+        string userResponse = $"Exception while running your command! Tell the host/developer to look for {randomNumber} in the log!```\n{Logger.EnsureShorterThan(args.Exception.ToString(), 1750, "\n[cut off for Discord]")}```";
 
 
         if (args.Context is SlashCommandContext sctx)
