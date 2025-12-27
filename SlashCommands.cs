@@ -398,12 +398,12 @@ internal class SlashCommands
                     continue;
                 
                 string newStr = Formatter.Sanitize(nextStr);
-                if (sb.Length + newStr.Length >= 2000)
+                if (sb.Length + newStr.Length > 2000)
                     break;
                 sb.AppendLine(newStr);
             }
 
-            string str = sb.Length == 0 ? "-# 🦗🦗🦗" :  sb.ToString();
-            await ctx.RespondAsync(sb.ToString(), true);
+            string str = sb.Length == 0 ? "-# ermmmm 🦗🦗🦗" :  sb.ToString();
+            await ctx.RespondAsync(str, true);
         }
 }

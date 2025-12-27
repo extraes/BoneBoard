@@ -48,7 +48,13 @@ internal class StickyMessages : ModuleBase
     {
         if (args.Author.IsBot)
         {
-            Logger.Put($"Ignoring message sent by bot: {args.Message}", LogType.Trace);
+            Logger.Put($"Ignoring message sent by bot: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
+            return;
+        }
+
+        if (args.Message.MessageType != DiscordMessageType.Default)
+        {
+            Logger.Put($"Ignoring irregular message: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
             return;
         }
 
@@ -73,7 +79,7 @@ internal class StickyMessages : ModuleBase
             }
             
             string content = sticky.Content;
-            Logger.Put($"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 150)}'");
+            Logger.Put($"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
             DiscordMessage msg;
             try
             {
