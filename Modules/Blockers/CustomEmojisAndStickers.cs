@@ -48,6 +48,9 @@ internal class CustomEmojisAndStickers : ModuleBase
         {
             return false;
         }
+        
+        if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            return false; // message is old enough to probably not be relevant
 
         string? reason = null;
         if (msg.Stickers?.FirstOrDefault()?.Type == DiscordStickerType.Guild) // false if no stickers

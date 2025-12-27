@@ -107,6 +107,8 @@ internal partial class WikiTopic : ModuleBase
             return false;
         if (!Config.values.channelsWhereMessagesMustBeOnTopic.Contains(msg.ChannelId))
             return false;
+        if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            return false; // message is old enough to probably not be relevant
 
 
         string content = msg.Content;

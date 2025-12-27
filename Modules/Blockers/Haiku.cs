@@ -46,6 +46,9 @@ internal class Haiku : ModuleBase
     {
         if (bot.IsMe(msg.Author))
             return false;
+        
+        if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            return false; // message is old enough to probably not be relevant
 
         string content = msg.Content;
         if (msg.Reference?.Type == DiscordMessageReferenceType.Forward && (msg.MessageSnapshots?.Count ?? 0) > 0)

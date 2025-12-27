@@ -31,6 +31,9 @@ internal class SheOnMyTill : ModuleBase
     {
         if (bot.IsMe(msg.Author))
             return false;
+        
+        if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            return false; // message is old enough to probably not be relevant
 
         if (!Config.values.channelsWhereMessagesMustConformToFormat.Contains(msg.ChannelId))
             return false;

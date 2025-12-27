@@ -48,6 +48,8 @@ internal class NoVowels : ModuleBase
     {
         if (bot.IsMe(msg.Author))
             return false;
+        if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            return false; // message is old enough to probably not be relevant
 
         bool hasVowelInDisallowedChannel = Config.values.channelsWhereNoVowelsAreAllowed.Contains(msg.ChannelId) && msg.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase));
 

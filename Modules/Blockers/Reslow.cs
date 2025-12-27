@@ -23,10 +23,11 @@ internal class Reslow(BoneBot bot) : ModuleBase(bot)
         {
             return MessageCheck(msgCreatedArgs.Message);
         }
-        else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
-        {
-            return MessageCheck(msgUpdatedArgs.Message);
-        }
+        // slowmode doesn't check on edit message
+        // else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
+        // {
+        //     return MessageCheck(msgUpdatedArgs.Message);
+        // }
 
         return false;
     }
