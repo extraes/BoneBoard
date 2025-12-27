@@ -16,7 +16,10 @@ internal class StickyMessages : ModuleBase
 
     public StickyMessages(BoneBot bot) : base(bot)
     {
-        // bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageCreated(MessageCreated));
+        bot.clientBuilder.ConfigureEventHandlers(x =>
+        {
+            x.HandleMessageCreated(MessageCreated);
+        });
     }
 
     protected override async Task FetchGuildResources()
@@ -48,6 +51,10 @@ internal class StickyMessages : ModuleBase
             Logger.Put($"Ignoring message sent by bot: {args.Message}", LogType.Trace);
             return;
         }
+
+        await Task.Delay(250);
+        if (await TryFetchMessage(args.Channel, args.Message.Id, true) is null)
+            return;
 
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
