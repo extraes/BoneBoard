@@ -21,9 +21,19 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
         foreach (string jumpLink in PersistentData.values.stickiedMessages)
         {
             DiscordMessage? msg = await bot.GetMessageFromLink(jumpLink);
+
             if (msg is not null)
+            {
                 stickyMessages.Add(msg);
+                Logger.Put($"Found sticky message @ {jumpLink} in {msg.Channel}");
+            }
+            else
+            {
+                Logger.Put($"Couldn't find sticky message @ {jumpLink} -- ignoring!");
+            }
         }
+        
+        UpdatePersistentData();
     }
 
     protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
@@ -33,7 +43,10 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
 
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
-        
+
+        Logger.Put(
+            $"New message sent in {args.Channel} -- now checking {stickyMessages.Count} stickies ({stickyMessages.Where(m => m.ChannelId == args.Channel.Id)})",
+            LogType.Trace);
         foreach (var sticky in stickyMessages)
         {
             if (sticky.ChannelId != args.Message.ChannelId)
