@@ -56,7 +56,7 @@ internal class FlagRestriction : ModuleBase
 
         if (ContainsDisallowedFlag(msg.Content, allowedFlags))
         {
-            if (msg.Timestamp.AddDays(1) > DateTime.Now)
+            if (msg.Timestamp.AddDays(1) < DateTime.Now)
                 return false; // message is old enough to probably not be relevant
             TryDeleteDontCare(msg, "you must rep the right flag in this channel. woe.");
 
