@@ -89,7 +89,6 @@ internal class BoneBot
             new Haiku(this),
             new WikiTopic(this),
         ];
-        stickyMessages = new(this);
         casino = new(this);
         hangman = new(this);
         frogRole = new(this);
@@ -98,6 +97,7 @@ internal class BoneBot
         msgBuffer = new(this);
         imageRoyale = new(this);
         videoRoyale = new(this);
+        stickyMessages = new(this);
         
         IEnumerable<Type> commandTypes = new[] { typeof(SlashCommands) }
             .Concat(ModuleBase.AllModules.Select(m => m.GetType())
