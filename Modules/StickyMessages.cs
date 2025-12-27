@@ -39,7 +39,10 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
     {
         if (args.Author.IsBot)
+        {
+            Logger.Put($"Ignoring message sent by bot: {args.Message}", LogType.Trace);
             return;
+        }
 
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
