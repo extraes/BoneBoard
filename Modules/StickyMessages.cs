@@ -168,11 +168,11 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     
     
     [Command("edit"), Description("Edits a stickied message")]
-    public async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
+    public async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
-
+        
         DiscordMessage? msg = await bot.GetMessageFromLink(jumpLink);
         if (msg is null)
         {
@@ -180,9 +180,20 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        stickyMessages.Remove(msg);
+        newContent = newContent.Replace("\\n", "\n");
+        try
+        {
+            await msg.ModifyAsync(newContent);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Failed to edit Sticky message @ {jumpLink}", ex);
+            await ctx.RespondAsync("Failed to edit message!\n" + Logger.EnsureShorterThan(Formatter.Sanitize(ex.ToString()), 1950), true);
+            return;
+        }
         
-        await ctx.RespondAsync($"Un-stickied that message!", true);
+        
+        await ctx.RespondAsync("Edited message!", true);
         UpdatePersistentData();
     }
 }

@@ -397,9 +397,10 @@ internal class SlashCommands
                 if (filterOut is not null && nextStr.Contains(filterOut, StringComparison.InvariantCultureIgnoreCase))
                     continue;
                 
-                if (sb.Length + nextStr.Length >= 2000)
+                string newStr = Formatter.Sanitize(nextStr);
+                if (sb.Length + newStr.Length >= 2000)
                     break;
-                sb.AppendLine(nextStr);
+                sb.AppendLine(newStr);
             }
 
             string str = sb.Length == 0 ? "-# 🦗🦗🦗" :  sb.ToString();
