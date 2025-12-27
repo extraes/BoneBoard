@@ -75,7 +75,7 @@ internal static class Logger
         Console.ResetColor();
         if (reason.writeToFile)
         {
-            logFile.WriteLine($"{starter}{reasonStr} -> {str}");
+            logFile.WriteLine(fileString);
             logFile.Flush();
         }
         logStatements.PushBack(fileString);

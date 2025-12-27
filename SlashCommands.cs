@@ -380,13 +380,24 @@ internal class SlashCommands
         [Command("getLogs")]
         [Description("Returns the last logs that'll fit in ~2000 characters")]
         [RequireApplicationOwner]
-        public async Task GetLogs(SlashCommandContext ctx, bool reverse)
+        public async Task GetLogs(SlashCommandContext ctx,
+            [Description("Only return logs that contain a specific string.")]
+            string? filterFor = null,
+            [Description("Only return logs that DON'T contain a specific string.")]
+            string? filterOut = null,
+            bool reverse = true)
         {
             StringBuilder sb = new();
-            var collection = reverse ? Logger.logStatements.Reverse() : Logger.logStatements; 
+            var collection = reverse ? Logger.logStatements.Reverse() : Logger.logStatements;
             foreach (var nextStr in collection)
             {
-                if (sb.Length + nextStr.Length > 1990)
+                
+                if (filterFor is not null && !nextStr.Contains(filterFor, StringComparison.InvariantCultureIgnoreCase))
+                    continue;
+                if (filterOut is not null && nextStr.Contains(filterOut, StringComparison.InvariantCultureIgnoreCase))
+                    continue;
+                
+                if (sb.Length + nextStr.Length >= 2000)
                     break;
                 sb.AppendLine(nextStr);
             }

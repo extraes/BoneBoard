@@ -37,9 +37,15 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
         foreach (var sticky in stickyMessages)
         {
             if (sticky.ChannelId != args.Message.ChannelId)
+            {
+                Logger.Put(
+                    $"New message {Logger.EnsureShorterThan(args.Message.ToString(), 50)} is not in the same channel as stickied message {Logger.EnsureShorterThan(sticky.Content, 50)} in {sticky.Channel}",
+                    LogType.Trace);
                 continue;
+            }
             
             string content = sticky.Content;
+            Logger.Put($"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 150)}'");
             DiscordMessage msg;
             try
             {
@@ -127,6 +133,26 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     
     [Command("remove"), Description("Stops a specific stickied message from being re-stickied in the future.")]
     public async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
+    {
+        if (await SlashCommands.ModGuard(ctx))
+            return;
+
+        DiscordMessage? msg = await bot.GetMessageFromLink(jumpLink);
+        if (msg is null)
+        {
+            await ctx.RespondAsync("Nothing was found from that link lol");
+            return;
+        }
+
+        stickyMessages.TryRemove(msg);
+        
+        await ctx.RespondAsync($"Un-stickied that message!", true);
+        UpdatePersistentData();
+    }
+    
+    
+    [Command("edit"), Description("Edits a stickied message")]
+    public async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
