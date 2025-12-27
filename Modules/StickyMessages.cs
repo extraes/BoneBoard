@@ -10,10 +10,15 @@ using DSharpPlus.EventArgs;
 namespace BoneBoard.Modules;
 
 [Command("sticky")]
-internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
+internal class StickyMessages : ModuleBase
 {
     private HashSet<DiscordMessage> stickyMessages = new();
-    
+
+    public StickyMessages(BoneBot bot) : base(bot)
+    {
+        bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageCreated(MessageCreated));
+    }
+
     protected override async Task FetchGuildResources()
     {
         stickyMessages.Clear();
