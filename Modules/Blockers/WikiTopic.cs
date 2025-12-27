@@ -168,7 +168,7 @@ internal partial class WikiTopic : ModuleBase
     {
         if (Config.values.channelsWhereMessagesMustBeOnTopic.Count == 0)
         {
-            Logger.Warn("No channels configured for wiki topic enforcement, skipping topic set");
+            // Logger.Warn("No channels configured for wiki topic enforcement, skipping topic set");
             return;
         }
 
