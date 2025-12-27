@@ -92,17 +92,19 @@ internal static class Logger
 
     static string GetCaller()
     {
-        StackTrace trace = new(1, true);
+        StackTrace trace = new(1, false);
         foreach (StackFrame frame in trace.GetFrames())
         {
             MethodBase? method = frame.GetMethod();
             Type? decType = method?.DeclaringType;
             if (method is null || decType is null) continue;
+            if (IsStepThrough(method)) continue;
 
             if (IsMoveNext(decType))
             {
                 return string.Concat(decType.DeclaringType!.Name, ".", decType.Name.Split('>').First().AsSpan(1));
             }
+            
 
             //if (decType != typeof(Logger) && decType != typeof(DiscordLogger) && IsTypeLoggable(decType))
             //{
@@ -122,5 +124,11 @@ internal static class Logger
     static bool IsMoveNext(Type t)
     {
         return t.GetCustomAttribute(typeof(CompilerGeneratedAttribute)) is not null && t.GetInterfaces().Any(i => i == typeof(IAsyncStateMachine));
+    }
+    
+    
+    static bool IsStepThrough(MethodBase m)
+    {
+        return m.GetCustomAttribute(typeof(DebuggerStepThroughAttribute)) is not null;
     }
 }

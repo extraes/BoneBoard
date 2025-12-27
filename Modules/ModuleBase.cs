@@ -87,11 +87,11 @@ internal abstract partial class ModuleBase
         inited = true;
     }
 
-    private async Task AllEventsHandler(DiscordClient client, DiscordEventArgs args)
+    private Task AllEventsHandler(DiscordClient client, DiscordEventArgs args)
     {
         // if a previous handler already stopped propagation, don't bother
         if (DontPropagate.Contains(args))
-            return;
+            return Task.CompletedTask;
 
         bool needStop = false;
 
@@ -110,6 +110,8 @@ internal abstract partial class ModuleBase
             Logger.Put($"Event type {args.GetType().Name} was blocked from propagation by {GetType().Name}");
             DontPropagate.PushBack(args);
         }
+        
+        return Task.CompletedTask;
     }
 
     private MethodInfo InstanceMethod(Delegate target, [CallerArgumentExpression(nameof(target))] string methodName = "") => GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
@@ -118,27 +120,30 @@ internal abstract partial class ModuleBase
     public void ConfigureEventHandlers()
     {
         bool hasBlocker = InstanceMethod(GlobalStopEventPropagation).DeclaringType == GetType();
-        var handlersThatNeedRegistering = new List<(bool needsRegister, Action<EventHandlingBuilder> builder)>
+        var handlersThatNeedRegistering = new List<(bool needsRegister, Action<EventHandlingBuilder> builder, string eventName)>
         {
-            (InstanceMethod(GuildDownloadCompleted).DeclaringType == GetType()  , builder => builder.HandleGuildDownloadCompleted(GuildDownloadCompletedEvent)),
-            (InstanceMethod(MessageCreated).DeclaringType == GetType()          , builder => builder.HandleMessageCreated(MessageCreatedEvent)                ),
-            (InstanceMethod(MessageUpdated).DeclaringType == GetType()          , builder => builder.HandleMessageUpdated(MessageUpdatedEvent)                ),
-            (InstanceMethod(ReactionAdded).DeclaringType == GetType()           , builder => builder.HandleMessageReactionAdded(ReactionAddedEvent)           ),
-            (InstanceMethod(ChannelCreated).DeclaringType == GetType()          , builder => builder.HandleChannelCreated(ChannelCreatedEvent)                ),
-            (InstanceMethod(ThreadCreated).DeclaringType == GetType()           , builder => builder.HandleThreadCreated(ThreadCreatedEvent)                  ),
-            (InstanceMethod(SessionCreated).DeclaringType == GetType()          , builder => builder.HandleSessionCreated(SessionCreatedEvent)                ),
-            (InstanceMethod(UnknownEvent).DeclaringType == GetType()            , builder => builder.HandleUnknownEvent(UnknownEventEvent)                    ),
+            (InstanceMethod(GuildDownloadCompleted).DeclaringType == GetType()  , builder => builder.HandleGuildDownloadCompleted(GuildDownloadCompletedEvent), "GuildDownloadCompleted"),
+            (InstanceMethod(MessageCreated).DeclaringType == GetType()          , builder => builder.HandleMessageCreated(MessageCreatedEvent)                , "MessageCreated"),
+            (InstanceMethod(MessageUpdated).DeclaringType == GetType()          , builder => builder.HandleMessageUpdated(MessageUpdatedEvent)                , "MessageUpdated"),
+            (InstanceMethod(ReactionAdded).DeclaringType == GetType()           , builder => builder.HandleMessageReactionAdded(ReactionAddedEvent)           , "ReactionAdded"),
+            (InstanceMethod(ChannelCreated).DeclaringType == GetType()          , builder => builder.HandleChannelCreated(ChannelCreatedEvent)                , "ChannelCreated"),
+            (InstanceMethod(ThreadCreated).DeclaringType == GetType()           , builder => builder.HandleThreadCreated(ThreadCreatedEvent)                  , "ThreadCreated"),
+            (InstanceMethod(SessionCreated).DeclaringType == GetType()          , builder => builder.HandleSessionCreated(SessionCreatedEvent)                , "SessionCreated"),
+            (InstanceMethod(UnknownEvent).DeclaringType == GetType()            , builder => builder.HandleUnknownEvent(UnknownEventEvent)                    , "UnknownEvent"),
         };
 
-        foreach (var (needsRegister, builder) in handlersThatNeedRegistering)
+        Logger.Put($"Now registering event handlers for {GetType().Name}", LogType.Debug);
+        foreach (var (needsRegister, builder, name) in handlersThatNeedRegistering)
         {
             if (needsRegister)
             {
                 bot.ConfigureEvents(builder);
+                Logger.Put($" * Registering event {name}...", LogType.Debug);
             }
         }
 
         Logger.Put($"Configured event handlers for {GetType().Name}, adding {handlersThatNeedRegistering.Count(x => x.needsRegister)} events{(hasBlocker ? " in addition to its blocker" : "")}.");
+        
     }
 
     // actual API shit that children are gonna use
