@@ -12,7 +12,7 @@ namespace BoneBoard.Modules;
 [Command("sticky")]
 internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
 {
-    private ConcurrentHashSet<DiscordMessage> stickyMessages = new();
+    private HashSet<DiscordMessage> stickyMessages = new();
     
     protected override async Task FetchGuildResources()
     {
@@ -83,7 +83,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
             return; // nothing done
 
         foreach (DiscordMessage msg in deletedStickies.Value)
-            stickyMessages.TryRemove(msg);
+            stickyMessages.Remove(msg);
         
         foreach (DiscordMessage msg in newMessages.Value)
             stickyMessages.Add(msg);
@@ -140,7 +140,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
         }
         
         foreach (DiscordMessage msg in removeMessages)
-            stickyMessages.TryRemove(msg);
+            stickyMessages.Remove(msg);
         
         
         await ctx.RespondAsync($"Un-stickied {removeMessages.Count} message(s)", true);
@@ -160,7 +160,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        stickyMessages.TryRemove(msg);
+        stickyMessages.Remove(msg);
         
         await ctx.RespondAsync($"Un-stickied that message!", true);
         UpdatePersistentData();
@@ -180,7 +180,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        stickyMessages.TryRemove(msg);
+        stickyMessages.Remove(msg);
         
         await ctx.RespondAsync($"Un-stickied that message!", true);
         UpdatePersistentData();
