@@ -20,9 +20,15 @@ internal static class Logger
         int maxFiles = Config.values.maxLogFiles;
         if (!Directory.Exists(Config.values.logPath)) Directory.CreateDirectory(Config.values.logPath);
         string filePath = Path.Combine(Config.values.logPath, DateTime.Now.ToString(FILE_DATE_FORMAT) + ".log");
+        string latestPath = Path.Combine(Config.values.logPath, "latest.log");
 
         Console.WriteLine("Initializing logger");
         logFile = File.AppendText(filePath);
+        
+        if (File.Exists(latestPath))
+            File.Delete(latestPath);
+        File.CreateSymbolicLink(latestPath, Path.GetFullPath(filePath));
+        
         Put("Created stream writer - logger now active, writing to " + filePath);
 
         // delete oldest log files over max log file count
