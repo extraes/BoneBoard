@@ -28,10 +28,14 @@ internal class WordPercentage : ModuleBase
 
     bool MessageCheck(DiscordMessage msg)
     {
+        if (msg.Author?.IsBot ?? true)
+            return false;
+        
         if (msg.Channel is null || !Config.values.channelsWhereMessagesMustHaveMinPercOfAWord.Contains(msg.Channel.Id))
         {
             return false;
         }
+        
         if (msg.Timestamp.AddDays(1) < DateTime.Now)
             return false; // message is old enough to probably not be relevant
 
