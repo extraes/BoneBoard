@@ -50,6 +50,8 @@ internal class PersistentData
 
     public string predictionBoardLink = "";
     public List<Modules.PredictionEvent> predictionEvents = new();
+
+    public List<string> stickiedMessages = new();
     
     static PersistentData()
     {
