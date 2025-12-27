@@ -16,7 +16,7 @@ internal class StickyMessages : ModuleBase
 
     public StickyMessages(BoneBot bot) : base(bot)
     {
-        bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageCreated(MessageCreated));
+        // bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageCreated(MessageCreated));
     }
 
     protected override async Task FetchGuildResources()
