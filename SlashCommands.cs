@@ -401,7 +401,8 @@ internal class SlashCommands
                     break;
                 sb.AppendLine(nextStr);
             }
-            
+
+            string str = sb.Length == 0 ? "-# 🦗🦗🦗" :  sb.ToString();
             await ctx.RespondAsync(sb.ToString(), true);
         }
 }
