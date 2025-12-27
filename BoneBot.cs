@@ -29,6 +29,7 @@ internal class BoneBot
     internal MessageBuffer msgBuffer;
     internal ImageRoyale imageRoyale;
     internal VideoRoyale videoRoyale;
+    internal StickyMessages stickyMessages;
     
     internal DiscordClientBuilder clientBuilder;
     internal DiscordClient client;
@@ -96,6 +97,7 @@ internal class BoneBot
         msgBuffer = new(this);
         imageRoyale = new(this);
         videoRoyale = new(this);
+        stickyMessages = new(this);
         
         IEnumerable<Type> commandTypes = new[] { typeof(SlashCommands) }
             .Concat(ModuleBase.AllModules.Select(m => m.GetType())
