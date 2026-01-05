@@ -12,10 +12,11 @@ namespace BoneBoard.Modules;
 [Command("sticky")]
 internal class StickyMessages : ModuleBase
 {
-    private HashSet<DiscordMessage> stickyMessages = new();
+    private static HashSet<DiscordMessage> stickyMessages = new();
 
     public StickyMessages(BoneBot bot) : base(bot)
     {
+        Logger.Put("instance of sticky created");
         bot.clientBuilder.ConfigureEventHandlers(x =>
         {
             x.HandleMessageCreated(MessageCreated);
@@ -42,39 +43,40 @@ internal class StickyMessages : ModuleBase
         }
         
         UpdatePersistentData();
+        Logger.Put($"Initialized with {stickyMessages.Count} messages in {stickyMessages.Select(m => m.ChannelId).Distinct().Count()} channels");
     }
 
     protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
     {
-        if (args.Author.IsBot)
+        if (args.Author.IsBot || bot.IsMe(args.Author))
         {
-            Logger.Put($"Ignoring message sent by bot: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
+            // Logger.Put($"Ignoring message sent by bot: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
             return;
         }
 
         if (args.Message.MessageType != DiscordMessageType.Default)
         {
-            Logger.Put($"Ignoring irregular message: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
+            // Logger.Put($"Ignoring irregular message: {Logger.EnsureShorterThan(args.Message.ToString(), 50)}", LogType.Trace);
             return;
         }
 
-        await Task.Delay(250);
-        if (await TryFetchMessage(args.Channel, args.Message.Id, true) is null)
-            return;
+        // await Task.Delay(250);
+        // if (await TryFetchMessage(args.Channel, args.Message.Id, true) is null)
+        //     return;
 
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
 
         Logger.Put(
-            $"New message sent in {args.Channel} -- now checking {stickyMessages.Count} stickies ({stickyMessages.Where(m => m.ChannelId == args.Channel.Id)})",
+            $"New message sent in {args.Channel} -- now checking {stickyMessages.Count} stickies ({stickyMessages.Count(m => m.ChannelId == args.Channel.Id)})",
             LogType.Trace);
         foreach (var sticky in stickyMessages)
         {
             if (sticky.ChannelId != args.Message.ChannelId)
             {
-                Logger.Put(
-                    $"New message {Logger.EnsureShorterThan(args.Message.ToString(), 50)} is not in the same channel as stickied message {Logger.EnsureShorterThan(sticky.Content, 50)} in {sticky.Channel}",
-                    LogType.Trace);
+                // Logger.Put(
+                //     $"New message {Logger.EnsureShorterThan(args.Message.ToString(), 50)} is not in the same channel as stickied message {Logger.EnsureShorterThan(sticky.Content, 50)} in {sticky.Channel}",
+                //     LogType.Trace);
                 continue;
             }
             
@@ -110,14 +112,14 @@ internal class StickyMessages : ModuleBase
         Logger.Put($"Re-stickied {newMessages.Value.Count} messages (deleted {deletedStickies.Value.Count} msgs)");
     }
 
-    private void UpdatePersistentData()
+    private static void UpdatePersistentData()
     {
         PersistentData.values.stickiedMessages = stickyMessages.Select(m => m.JumpLink.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
         PersistentData.WritePersistentData();
     }
 
     [Command("create"), Description("Creates a new sticky message in this channel.")]
-    public async Task CreateStickyMessage(
+    public static async Task CreateStickyMessage(
         SlashCommandContext ctx,
         [Description("\\n will be replaced with a newline.")] string content)
     {
@@ -143,7 +145,7 @@ internal class StickyMessages : ModuleBase
     }
     
     [Command("clear"), Description("Stops any stickied messages in this channel from being re-stickied in the future.")]
-    public async Task ClearStickyMessages(SlashCommandContext ctx)
+    public static async Task ClearStickyMessages(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
@@ -166,12 +168,12 @@ internal class StickyMessages : ModuleBase
     }
     
     [Command("remove"), Description("Stops a specific stickied message from being re-stickied in the future.")]
-    public async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
+    public static async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
 
-        DiscordMessage? msg = await bot.GetMessageFromLink(jumpLink);
+        DiscordMessage? msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
         if (msg is null)
         {
             await ctx.RespondAsync("Nothing was found from that link lol");
@@ -186,12 +188,12 @@ internal class StickyMessages : ModuleBase
     
     
     [Command("edit"), Description("Edits a stickied message")]
-    public async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
+    public static async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
         
-        DiscordMessage? msg = await bot.GetMessageFromLink(jumpLink);
+        DiscordMessage? msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
         if (msg is null)
         {
             await ctx.RespondAsync("Nothing was found from that link lol");

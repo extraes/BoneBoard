@@ -75,9 +75,9 @@ internal partial class Casino
         DidntHappen
     }
     
-    private DiscordMessage? predictionBoard;
+    private static DiscordMessage? predictionBoard;
 
-    private async Task<DiscordMessage?> GetPredictionMessage()
+    private static async Task<DiscordMessage?> GetPredictionMessage()
     {
         if (string.IsNullOrWhiteSpace(PersistentData.values.predictionBoardLink))
         {
@@ -89,12 +89,13 @@ internal partial class Casino
             PersistentData.values.predictionBoardLink.EndsWith(predictionBoard.Id.ToString()))
             return predictionBoard;
             
-        var msg = await bot.GetMessageFromLink(PersistentData.values.predictionBoardLink);
+        // fuck it man who even cares anymore
+        var msg = await BoneBot.Bots.First().Value.GetMessageFromLink(PersistentData.values.predictionBoardLink);
         predictionBoard = msg;
         return msg;
     }
 
-    private async Task UpdatePredictionMessage()
+    private static async Task UpdatePredictionMessage()
     {
         var msg = await GetPredictionMessage();
         if (msg is null)
@@ -150,7 +151,7 @@ internal partial class Casino
         }
     }
 
-    private async Task<PredictionEvent?> GetEventOrRespond(SlashCommandContext ctx, string title)
+    private static async Task<PredictionEvent?> GetEventOrRespond(SlashCommandContext ctx, string title)
     {
         var target = PersistentData.values.predictionEvents.MinBy(p => p.title.LevenshteinDistance(title));
         if (target is null)
@@ -177,7 +178,7 @@ internal partial class Casino
     [Command("createEvent"), Description("Let people bet on something.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task CreateEvent(SlashCommandContext ctx, string title, string criteria, int totalSeedAmount = 10_000)
+    public static async Task CreateEvent(SlashCommandContext ctx, string title, string criteria, int totalSeedAmount = 10_000)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
@@ -200,7 +201,7 @@ internal partial class Casino
     [Command("modifyEvent"), Description("Modifies an event's title or description.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task ModifyEvent(SlashCommandContext ctx, string originalTitle, string newTitle = "", string newCriteria = "")
+    public static async Task ModifyEvent(SlashCommandContext ctx, string originalTitle, string newTitle = "", string newCriteria = "")
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
@@ -233,7 +234,7 @@ internal partial class Casino
     [Command("resolveEvent"), Description("Resolves an event, paying out its bettors")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task ResolveEvent(SlashCommandContext ctx, string title, Resolution resolution)
+    public static async Task ResolveEvent(SlashCommandContext ctx, string title, Resolution resolution)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
@@ -290,7 +291,7 @@ internal partial class Casino
     [Command("unlockFor"), Description("Unlocks an event for a given amount of time, allowing betting.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task UnlockEvent(SlashCommandContext ctx, string title, double openForHours)
+    public static async Task UnlockEvent(SlashCommandContext ctx, string title, double openForHours)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;
@@ -316,7 +317,7 @@ internal partial class Casino
 
     [Command("predict")]
     [RequireGuild]
-    public async Task BetOnEvent(SlashCommandContext ctx, string title, int stake, bool willItHappen, bool overridePrevBets = false)
+    public static async Task BetOnEvent(SlashCommandContext ctx, string title, int stake, bool willItHappen, bool overridePrevBets = false)
     {
         var target = await GetEventOrRespond(ctx, title);
         if (target is null)
@@ -388,7 +389,7 @@ internal partial class Casino
     [Command("postPredictionBoard"), Description("Creates a new message for the prediction board in this channel")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task UnlockEvent(SlashCommandContext ctx)
+    public static async Task UnlockEvent(SlashCommandContext ctx)
     {
         if (await SlashCommands.ModGuard(ctx))
             return;

@@ -51,7 +51,7 @@ internal class ImageRoyale : ModuleBase
             DateTime next = new(now.Year, now.Month, sendTime.ToTimeSpan() < now.TimeOfDay ? now.Day + 1 : now.Day, sendTime.Hour, sendTime.Minute, sendTime.Second);
             if (sendTimer is null)
             {
-                Logger.Warn("Creating new ImageRoyale timer, heres the callstack: " + Environment.StackTrace);
+                // Logger.Warn("Creating new ImageRoyale timer, heres the callstack: " + Environment.StackTrace);
                 sendTimer = new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
             }
             sendTimer.Change(next - now, TimeSpan.FromDays(1));

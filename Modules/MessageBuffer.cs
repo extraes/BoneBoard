@@ -28,8 +28,6 @@ internal partial class MessageBuffer : ModuleBase
     Dictionary<string, string> cachedQueuedAttachmentPaths = new();
     HttpClient attachmentDownloadClient = new();
 
-    //sanitizing
-    static readonly Regex mdCleaningRegex = MarkdownCleaningRegex();
 
     public MessageBuffer(BoneBot bot) : base(bot) { }
 
@@ -131,8 +129,8 @@ internal partial class MessageBuffer : ModuleBase
                         reference = refMsg;
 
 
-                    string author = recreateMessage.Author is DiscordMember member ? mdCleaningRegex.Replace(member.DisplayName, @$"\$1").Replace("://", "\\://") : recreateMessage.Author?.Username ?? "uhh i forgor";
-                    string replyingToAuthor = reference?.Author is DiscordMember replyMember ? mdCleaningRegex.Replace(replyMember.DisplayName, @$"\$1").Replace("https:", "https\\:") : reference?.Author?.Username ?? "NOBODY LOL";
+                    string author = recreateMessage.Author is DiscordMember member ? Formatter.Strip(member.DisplayName).Replace("://", "\\://") : recreateMessage.Author?.Username ?? "uhh i forgor";
+                    string replyingToAuthor = reference?.Author is DiscordMember replyMember ? Formatter.Strip(replyMember.DisplayName).Replace("https:", "https\\:") : reference?.Author?.Username ?? "NOBODY LOL";
                     string replyingToContent = reference is not null ? Logger.EnsureShorterThan(reference.Content, 200, "(yap)").Replace("\n", "") : "";
                     string content = Logger.EnsureShorterThan(recreateMessage.Content, 2000 - replyingToAuthor.Length - replyingToContent.Length - author.Length - 50, "(Truncated due to excessive yapping)");
 
@@ -235,8 +233,4 @@ internal partial class MessageBuffer : ModuleBase
         TimeSpan waitTime = TimeSpan.FromMinutes(Config.values.bufferTimeMinutes);
         dumpMessagesTimer = new(_ => _ = SendBufferedMessages(), null, waitTime, waitTime);
     }
-
-
-    [GeneratedRegex(@"(?<!\\)(\[|\]|\*|_|~|`|<|>|#)", RegexOptions.Compiled)]
-    private static partial Regex MarkdownCleaningRegex();
 }

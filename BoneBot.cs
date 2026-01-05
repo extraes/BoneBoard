@@ -72,10 +72,6 @@ internal class BoneBot
         //clientBuilder.SetLogLevel(LogLevel.Trace);
         //clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
         clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Trace)));
-        clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(BoneBot), this));
-        SlashCommandProcessor scp = new();
-        MessageCommandProcessor mcp = new();
-
         blockers =
         [
             new ModeratorIgnore(this),
@@ -98,10 +94,28 @@ internal class BoneBot
         imageRoyale = new(this);
         videoRoyale = new(this);
         stickyMessages = new(this);
+        // clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(StickyMessages), stickyMessages));
         
-        IEnumerable<Type> commandTypes = new[] { typeof(SlashCommands) }
+        clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(BoneBot), this));
+        SlashCommandProcessor scp = new();
+        MessageCommandProcessor mcp = new();
+
+        
+        
+        Type[] commandTypes = new[] { typeof(SlashCommands) }
             .Concat(ModuleBase.AllModules.Select(m => m.GetType())
-                .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null));
+            .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null))
+            .ToArray();
+
+        for (int i = commandTypes.Length - 1; i >= 0; i--)
+        {
+            Type type =  commandTypes[i];
+            var instanceCommands = type.GetMethods().Where(m => !m.IsStatic && m.GetCustomAttribute<CommandAttribute>() != null);
+            foreach (var cmd in instanceCommands)
+            {
+                Logger.Warn($"DICKHEAD!!!! DONT MAKE INSTANCED COMMANDS!!!!! Offender: {type.FullName ?? "<Anonymous type>"}.{cmd.Name}");
+            }
+        }
         
         // IEnumerable<CommandBuilder> commandBuilders = new[] { typeof(SlashCommands) }
         //     .Concat(ModuleBase.AllModules.Select(m => m.GetType())
@@ -137,12 +151,13 @@ internal class BoneBot
             
         });
 
-        client = clientBuilder.Build();
-
         foreach (var module in ModuleBase.AllModules)
         {
             module.ConfigureEventHandlers();
         }
+        
+        client = clientBuilder.Build();
+
         Bots.Add(client, this);
     }
 
