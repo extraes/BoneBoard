@@ -47,6 +47,11 @@ internal class StickyMessages : ModuleBase
         if (args.Message.MessageType != DiscordMessageType.Default)
             return;
 
+
+        int prelength = stickyMessages.Count;
+        stickyMessages = stickyMessages.DistinctBy(m => m.Id).ToList();
+        Logger.Put($"Removed {prelength - stickyMessages.Count} duplicates from stickymessages", LogType.Trace);
+            
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
 
