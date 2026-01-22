@@ -167,20 +167,26 @@ internal class FrogRole : ModuleBase
             return;
         }
 
+        if (args.Guild is null)
+        {
+            return;
+        }
+
         if (frogMsg is null || args.Message != frogMsg)
             return;
 
         if (args.Emoji.Name != "🐸")
         {
             Logger.Put($"Removing non-frog reaction (of {args.Emoji.Name}) by {args.User.GlobalName} ({args.User.Username}) from frog message.");
-            await args.Message.DeleteReactionAsync(args.Emoji, args.User, "Not a frog!!!!");
+            await TryDeleteAsync(args.Message, args.Emoji, args.User, "Not a frog!!!!");
             return;
         }
 
         if (assigningNewKing)
         {
             Logger.Put($"To prevent race condition, removing frog reaction by {args.User.GlobalName} ({args.User.Username}) from frog message.");
-            await args.Message.DeleteReactionAsync(args.Emoji, args.User, "Top 10 solutions to race conditions - Number 1: Deleting the problem and pretending it doesn't exist");
+            await TryDeleteAsync(args.Message, args.Emoji, args.User,
+                "Top 10 solutions to race conditions - Number 1: Deleting the problem and pretending it doesn't exist");
             return;
         }
 
@@ -190,10 +196,9 @@ internal class FrogRole : ModuleBase
         {
             if (user == args.User || user == bot.client.CurrentUser)
                 continue;
-
-
+            
             Logger.Put($"Removing frog reaction by {user.GlobalName} ({user.Username}) from frog message.", LogType.Debug);
-            await args.Message.DeleteReactionAsync(args.Emoji, user, "The king is dead, long live the king!");
+            await TryDeleteAsync(args.Message, args.Emoji, args.User, "The king is dead, long live the king!");
         }
 
         await AssignNewFrogKing(client, args.Guild, args.User);
