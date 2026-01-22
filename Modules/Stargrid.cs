@@ -129,7 +129,7 @@ internal class Stargrid : ModuleBase
         await HandleQuoteeDeleteRequest(args);
 
         if (!Config.values.requiredEmojis.Contains(args.Emoji.Id)) return;
-        if (args.Channel.IsPrivate || args.User is not DiscordMember member) return;
+        if (args.Channel.IsPrivate || args.User is not DiscordMember member || args.Guild is null) return;
         if (!MemberReactionCounts(member)) return;
 
         List<DiscordMember> membersThatReacted;
