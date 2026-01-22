@@ -59,8 +59,10 @@ internal class VideoRoyale : ModuleBase
 
             TimeSpan waitTime = nextSendTime - now;
             Logger.Put($"Waiting {waitTime.Days}d {waitTime} to send videoroyale", LogType.Debug);
-            sendTimer ??= new(SendTopVideo, null, nextSendTime - now, TimeSpan.FromDays(7));
-            sendTimer.Change(nextSendTime - now, TimeSpan.FromDays(7));
+            if (waitTime < TimeSpan.Zero)
+                waitTime = TimeSpan.FromMinutes(1);
+            sendTimer ??= new(SendTopVideo, null, waitTime, TimeSpan.FromDays(7));
+            sendTimer.Change(waitTime, TimeSpan.FromDays(7));
         }
 
         try
