@@ -71,7 +71,7 @@ internal class BoneBot
         Relauncher.RelaunchParameters.SetupProcessStartMessage(Environment.GetCommandLineArgs(), clientBuilder);
         //clientBuilder.SetLogLevel(LogLevel.Trace);
         //clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
-        clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Trace)));
+        clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Warning)));
         blockers =
         [
             new ModeratorIgnore(this),
@@ -107,15 +107,16 @@ internal class BoneBot
             .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null))
             .ToArray();
 
-        for (int i = commandTypes.Length - 1; i >= 0; i--)
-        {
-            Type type =  commandTypes[i];
-            var instanceCommands = type.GetMethods().Where(m => !m.IsStatic && m.GetCustomAttribute<CommandAttribute>() != null);
-            foreach (var cmd in instanceCommands)
-            {
-                Logger.Warn($"DICKHEAD!!!! DONT MAKE INSTANCED COMMANDS!!!!! Offender: {type.FullName ?? "<Anonymous type>"}.{cmd.Name}");
-            }
-        }
+        // doesnt matter anyway lol D#+ creates a new instance for every invocation, even on static commands
+        // for (int i = commandTypes.Length - 1; i >= 0; i--)
+        // {
+        //     Type type =  commandTypes[i];
+        //     var instanceCommands = type.GetMethods().Where(m => !m.IsStatic && m.GetCustomAttribute<CommandAttribute>() != null);
+        //     foreach (var cmd in instanceCommands)
+        //     {
+        //         Logger.Warn($"DICKHEAD!!!! DONT MAKE INSTANCED COMMANDS!!!!! Offender: {type.FullName ?? "<Anonymous type>"}.{cmd.Name}");
+        //     }
+        // }
         
         // IEnumerable<CommandBuilder> commandBuilders = new[] { typeof(SlashCommands) }
         //     .Concat(ModuleBase.AllModules.Select(m => m.GetType())
