@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Diagnostics;
 using DSharpPlus.Commands.ContextChecks;
 using System.ComponentModel;
+using CircularBuffer;
 using DSharpPlus;
 
 namespace BoneBoard.Modules.Blockers;
@@ -20,6 +21,7 @@ namespace BoneBoard.Modules.Blockers;
 [Command("starignore")]
 internal class ModeratorIgnore : ModuleBase
 {
+    static CircularBuffer<ulong> ignoredMessages = new(128);
     static int eventsProcessed = 0;
     static Stopwatch timeWasted = new();
     public enum TimeUnit
@@ -41,9 +43,21 @@ internal class ModeratorIgnore : ModuleBase
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         timeWasted.Start();
-        DiscordUser? user = GetUser(eventArgs);
+        DiscordMessage? msg = eventArgs switch
+        {
+            MessageCreatedEventArgs created => created.Message,
+            MessageDeletedEventArgs deleted => deleted.Message,
+            MessageUpdatedEventArgs updated => updated.Message,
+            _ => null
+        };
+        
+        DiscordUser? user = msg?.Author ?? GetUser(eventArgs);
         eventsProcessed++;
         timeWasted.Stop();
+
+        if (msg is not null && ignoredMessages.Contains(msg.Id))
+            return true;
+        
         if (user is null)
             return false;
 
@@ -58,6 +72,9 @@ internal class ModeratorIgnore : ModuleBase
                 return false;
             }
 
+            if (msg is not null)
+                ignoredMessages.PushBack(msg.Id);
+            
             return true;
         }
 
@@ -72,6 +89,9 @@ internal class ModeratorIgnore : ModuleBase
             data.ignoreCount--;
             ignoreCounts[user] = data;
 
+            if (msg is not null)
+                ignoredMessages.PushBack(msg.Id);
+            
             return true;
         }
 
