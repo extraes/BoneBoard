@@ -16,8 +16,24 @@ class Program
 
         string projFolder = Path.GetDirectoryName(parms.buildProject) ?? Environment.CurrentDirectory;
         string projFile = Path.GetFileName(parms.buildProject)!;
-        string dotnetBuildOutput;
 
+        string cleanOutput;
+        Process cleanProc = new()
+        {
+            StartInfo = new()
+            {
+                FileName = "dotnet",
+                Arguments = "clean",
+                WorkingDirectory = projFolder,
+                RedirectStandardOutput = true,
+            }
+        };
+        string cleanInvocation = $"{cleanProc.StartInfo.FileName} {cleanProc.StartInfo.Arguments} [in {projFolder}]";
+        cleanProc.Start();
+        cleanProc.WaitForExit();
+        cleanOutput = cleanProc.StandardOutput.ReadToEnd();
+        
+        string dotnetBuildOutput;
         Process proc = new()
         {
             StartInfo = new()
@@ -29,7 +45,7 @@ class Program
             }
         };
 
-        string invokedInfo = $"dotnet build \"{projFile}\" [in {projFolder}]";
+        string buildInvocation = $"{proc.StartInfo.FileName} {proc.StartInfo.Arguments} [in {projFolder}]";
         
         proc.Start();
         proc.WaitForExit();
@@ -43,8 +59,10 @@ class Program
                 WorkingDirectory = parms.launchWorkingDir
             }
         };
+
+        string runCommandsParameter = $"{cleanInvocation} => {cleanOutput}\n\n{buildInvocation} => {dotnetBuildOutput}";
         proc.StartInfo.ArgumentList.Add(RelaunchParameters.RELAUNCHED_ARG);
-        proc.StartInfo.ArgumentList.Add(invokedInfo + " => " + dotnetBuildOutput);
+        proc.StartInfo.ArgumentList.Add(runCommandsParameter);
         if (parms.initiatorId.HasValue)
             proc.StartInfo.ArgumentList.Add("USERID=" + parms.initiatorId.Value);
 
