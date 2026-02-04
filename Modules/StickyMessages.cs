@@ -12,7 +12,8 @@ namespace BoneBoard.Modules;
 [Command("sticky")]
 internal class StickyMessages : ModuleBase
 {
-    private static List<DiscordMessage> stickyMessages = new();
+    private static List<DiscordMessage> needRecache = [];
+    private static List<DiscordMessage> stickyMessages = [];
 
     public StickyMessages(BoneBot bot) : base(bot) { }
 
@@ -44,8 +45,18 @@ internal class StickyMessages : ModuleBase
         if (args.Author.IsBot || bot.IsMe(args.Author))
             return;
 
-        if (args.Message.MessageType != DiscordMessageType.Default)
-            return;
+        switch (args.Message.MessageType)
+        {
+            case DiscordMessageType.Reply:
+            case DiscordMessageType.AutoModerationAlert:
+            case DiscordMessageType.Default:
+                // only resend the message whenever a new substantial message is sent 
+                break;
+            default:
+                if (args.Message.Reference is not null)
+                    break; // probably a crosspost, continue to repost
+                return;
+        }
 
 
         int prelength = stickyMessages.Count;
@@ -62,6 +73,19 @@ internal class StickyMessages : ModuleBase
                 continue;
 
             string content = sticky.Content;
+            if (needRecache.Contains(sticky))
+            {
+                try
+                {
+                    var updatedMsg = await args.Channel.GetMessageAsync(sticky.Id, true);
+                    content = updatedMsg.Content;
+                }
+                catch
+                {
+                    // failure to fetch new content, that's fine, just resend the old content
+                }
+            }
+            
             Logger.Put(
                 $"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
             DiscordMessage newMsg;
@@ -182,6 +206,7 @@ internal class StickyMessages : ModuleBase
         try
         {
             await msg.ModifyAsync(newContent);
+            needRecache.Add(msg);
         }
         catch (Exception ex)
         {
