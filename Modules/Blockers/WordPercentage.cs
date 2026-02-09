@@ -4,13 +4,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class WordPercentage : ModuleBase
+internal partial class WordPercentage : ModuleBase
 {
     public WordPercentage(BoneBot bot) : base(bot) { }
+
+    private static Regex whitespace = MyRegex();
 
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
@@ -53,9 +56,12 @@ internal class WordPercentage : ModuleBase
     private static bool WordPercentageIsTooLow(string message)
     {
         string checkWordsAgainst = message.Replace('’', '\'').Replace("'", "");
-        var words = checkWordsAgainst.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var words = whitespace.Split(checkWordsAgainst);
         var wordPerc = words.Length == 0 ? 1 : words.Count(w => Config.values.theWordOrWords.Any(s => s.Equals(w, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
         bool wordPercTooLow = wordPerc < Config.values.wordPercentage;
         return wordPercTooLow;
     }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex MyRegex();
 }
