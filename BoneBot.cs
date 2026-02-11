@@ -68,7 +68,7 @@ internal class BoneBot
                 .HandleUnknownEvent((c, a) => Task.CompletedTask);
         });
         
-        Relauncher.RelaunchParameters.SetupProcessStartMessage(Environment.GetCommandLineArgs(), clientBuilder);
+        RelaunchParameters.SetupProcessStartMessage(Environment.GetCommandLineArgs(), clientBuilder);
         //clientBuilder.SetLogLevel(LogLevel.Trace);
         //clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
         clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Warning)));

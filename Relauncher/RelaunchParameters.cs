@@ -1,7 +1,6 @@
 using System.Text;
 
-namespace Relauncher;
-
+// ReSharper disable once CheckNamespace
 public record class RelaunchParameters
 {
     internal const string RELAUNCHED_ARG = "RELAUNCHED";
@@ -64,12 +63,12 @@ public record class RelaunchParameters
     private static bool sentMessage = false;
     public static void SetupProcessStartMessage(string[] args, DSharpPlus.DiscordClientBuilder clientBuilder)
     {
-        BoneBoard.Logger.Put("Launched with arguments...");
+        Logger.Put("Launched with arguments...");
         foreach (string arg in args)
         {
-            BoneBoard.Logger.Put(" - " + arg);
+            Logger.Put(" - " + arg);
         }
-        BoneBoard.Logger.Put($"From working dir: {Environment.CurrentDirectory}");
+        Logger.Put($"From working dir: {Environment.CurrentDirectory}");
         if (!args.Contains(RELAUNCHED_ARG))
             return;
         
@@ -99,13 +98,13 @@ public record class RelaunchParameters
             sb.AppendLine($"## Restarted successfully!");
             sb.AppendLine(buildOutput);
             
-            await channel.SendMessageAsync(BoneBoard.Logger.EnsureShorterThan(sb.ToString(), 2000));
+            await channel.SendMessageAsync(Logger.EnsureShorterThan(sb.ToString(), 2000));
             
-            BoneBoard.Logger.Put($"Successfully DMed initiator ({initiatorId}) to tell them dotnet build output!");
+            Logger.Put($"Successfully DMed initiator ({initiatorId}) to tell them dotnet build output!");
         }
         catch (Exception e)
         {
-            BoneBoard.Logger.Error($"Failed to DM user after relaunching! Initiator ID: {initiatorId}", e);
+            Logger.Error($"Failed to DM user after relaunching! Initiator ID: {initiatorId}", e);
         }
 
         sentMessage = true;
