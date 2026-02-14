@@ -46,7 +46,7 @@ internal partial class WordPercentage : ModuleBase
         
         // will ignore link-only messages & attachment-only no-content messages
         if (string.IsNullOrWhiteSpace(Link.Replace(msg.Content, "")))
-            return true;
+            return false;
 
         if (WordPercentageIsTooLow(msg.Content))
         {
