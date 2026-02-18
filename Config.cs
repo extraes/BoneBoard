@@ -72,6 +72,7 @@ internal class Config
     public ulong[] channelsWhereNoVowelsAreAllowed = Array.Empty<ulong>();
 
     public ulong[] channelsWhereMessagesMustHaveMinPercOfAWord = Array.Empty<ulong>();
+    [TomlPrecedingComment("Don't include quotation marks or apostrophes")]
     public string[] theWordOrWords = Array.Empty<string>();
     public float wordPercentage = 0.05f;
 

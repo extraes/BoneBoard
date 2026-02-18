@@ -48,10 +48,18 @@ internal partial class WordPercentage : ModuleBase
         if (string.IsNullOrWhiteSpace(Link.Replace(msg.Content, "")))
             return false;
 
-        if (WordPercentageIsTooLow(msg.Content))
+        string checkWordsAgainst = msg.Content.Replace('’', '\'').Replace("'", "");
+        var words = Whitespace.Split(checkWordsAgainst);
+        if (WordPercentageIsTooLow(words))
         {
-            
             TryDeleteDontCare(msg, "you must use more of the designated words in this channel. woe.");
+
+            return true;
+        }
+
+        if (AlLWordsClumpedTogether(words))
+        {
+            TryDeleteDontCare(msg, "you .");
 
             return true;
         }
@@ -59,11 +67,42 @@ internal partial class WordPercentage : ModuleBase
         return false;
     }
 
-    private static bool WordPercentageIsTooLow(string message)
+    private bool AlLWordsClumpedTogether(string[] words)
     {
-        string checkWordsAgainst = message.Replace('’', '\'').Replace("'", "");
-        var words = Whitespace.Split(checkWordsAgainst);
-        var wordPerc = words.Length == 0 ? 1 : words.Count(w => Config.values.theWordOrWords.Any(s => s.Equals(w, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
+        bool[] wordsThatCount = words.Select(w =>
+            Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))
+            ).ToArray();
+
+        List<int> chunkSizeLengths = new(4);
+        int currChunkSize = 0;
+        foreach (bool counts in wordsThatCount)
+        {
+            if (counts)
+            {
+                currChunkSize++;
+            }
+            else
+            {
+                if (currChunkSize > 0)
+                    chunkSizeLengths.Add(currChunkSize);
+                
+                currChunkSize = 0;
+            }
+        }
+        
+        Logger.Put($"message {string.Join(", ", words)} has the following chunk sizes: {string.Join(", ", chunkSizeLengths)}");
+
+        if (chunkSizeLengths is [1])
+            return false;
+        else if (chunkSizeLengths.Count == 1 && chunkSizeLengths[0] > 3 && wordsThatCount.EndsWith(true))
+            return true;
+
+        return false;
+    }
+
+    private static bool WordPercentageIsTooLow(string[] words)
+    {
+        var wordPerc = words.Length == 0 ? 1 : words.Count(w => Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
         bool wordPercTooLow = wordPerc < Config.values.wordPercentage;
         return wordPercTooLow;
     }
