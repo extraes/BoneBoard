@@ -65,7 +65,7 @@ class Program
             }
         };
 
-        string runCommandsParameter = $"{cleanInvocation} => {cleanOutput}\n\n{buildInvocation} => {dotnetBuildOutput}";
+        string runCommandsParameter = $"### {cleanInvocation}\n{cleanOutput}\n\n### {buildInvocation}\n{dotnetBuildOutput}";
         proc.StartInfo.ArgumentList.Add(RelaunchParameters.RELAUNCHED_ARG);
         proc.StartInfo.ArgumentList.Add(runCommandsParameter);
         if (parms.initiatorId.HasValue)
