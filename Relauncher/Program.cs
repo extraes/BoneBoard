@@ -33,8 +33,8 @@ class Program
         cleanProc.WaitForExit();
         string[] cleanLines = cleanProc.StandardOutput.ReadToEnd().Replace(projFolder, "$PWD").Split(Environment.NewLine);
         string[] cleanLinesWithoutDeletions =
-            cleanLines.Where(str => !(str.Contains("Deleting file") && str.Contains(".dll"))).ToArray();
-        string deletedFiles = $"*Not shown: {cleanLines.Length - cleanLinesWithoutDeletions.Length} DLL deletions*";
+            cleanLines.Where(str => !str.Contains("Deleting file")).ToArray();
+        string deletedFiles = $"*Not shown: {cleanLines.Length - cleanLinesWithoutDeletions.Length} deletions*";
         cleanOutput = string.Join(Environment.NewLine, cleanLinesWithoutDeletions) + "\n" + deletedFiles;
         
         
