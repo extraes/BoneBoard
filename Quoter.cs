@@ -1,4 +1,5 @@
-﻿using DSharpPlus;
+﻿using System.Diagnostics.CodeAnalysis;
+using DSharpPlus;
 using DSharpPlus.Entities;
 using SixLabors.Fonts;
 using SixLabors.Fonts.Unicode;
@@ -16,6 +17,7 @@ using StableCube.Media.Gifsicle;
 
 namespace BoneBoard;
 
+[SuppressMessage("ReSharper", "AccessToModifiedClosure")]
 internal static partial class Quoter
 {
     internal static readonly Regex UserMention = BakedRegex_UserMention();
@@ -38,12 +40,13 @@ internal static partial class Quoter
     [GeneratedRegex(@"<a?:([\w0-9]+):([0-9]+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
     private static partial Regex BakedRegex_CustomEmoji();
 
-    static readonly HttpClient pfpGetter = new();
-    static readonly HttpClient mediaGetter = new();
-    static readonly HttpClient emojiGetter = new();
-    const string CUSTOM_EMOJI_SUBSTITUTE = "🔲";
-    static readonly List<Match> matchedCustomEmojis = new();
-    static readonly ConditionalWeakTable<string, Image> emojiImageCache = new();
+    private static readonly HttpClient pfpGetter = new();
+    private static readonly HttpClient mediaGetter = new();
+    private static readonly HttpClient emojiGetter = new();
+    private const string CUSTOM_EMOJI_SUBSTITUTE = "🔲"; // White square with black outline emoji
+    private static readonly List<Match> matchedCustomEmojis = new();
+    private static readonly ConditionalWeakTable<string, Image> emojiImageCache = new();
+
 
     public static async Task<Image?> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)
     {
@@ -187,77 +190,6 @@ internal static partial class Quoter
             emojiDrawer = (quoteImages, allGlyphs, blockBounds, lineCount) =>
             {
                 (Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) = quoteImages;
-                //float lineHeight = blockBounds.Height / lineCount;
-                //float currX = 0;
-                //float currY = 0;
-
-                ////var indicesEnumerator = indices.GetEnumerator();
-                //int currEmojiIdx = 0;
-
-                //for(int i = 0; i < allGlyphs.Length; i++)
-                //{
-                //    GlyphBounds bounds = allGlyphs[i];
-                //    currX += bounds.Bounds.Width;
-                //    if (currX > blockBounds.Width)
-                //    {
-                //        currX = 0;
-                //        currY += lineHeight;
-                //        //continue;
-                //    }
-
-                //    if (currEmojiIdx >= indices.Count)
-                //        break;
-
-                //    if (i >= indices[currEmojiIdx])
-                //    {
-                //        var emoji = emojis[currEmojiIdx];
-                //        currEmojiIdx++;
-                //        if (emoji is not null)
-                //        {
-                //            var emojiRect = new Rectangle((int)(currX + blockBounds.X), (int)(currY + blockBounds.Y), (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
-                //            quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
-                //        }
-                //    }
-
-                //    i += bounds.Codepoint.Utf16SequenceLength - 1;
-                //}
-
-                //int remap = 0; // so it can be reused, otherwise indices[i] without remap would throw an exception when slicing
-                //for (int i = 0; i < indices.Count; i++)
-                //{
-                //    if (emojis[i] is null)
-                //        continue;
-
-                //    int sliceTo = Math.Clamp(indices[i] + remap - 1, 0, int.MaxValue);
-                //    remap = 0;
-                //    foreach (GlyphBounds pastBound in allGlyphs.Slice(0, sliceTo))
-                //    {
-                //        remap -= pastBound.Codepoint.Utf16SequenceLength - 1;
-                //    }
-                
-                //    var bounds = allGlyphs[indices[i] + remap];
-                //    var emoji = emojis[i]!;
-                //    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
-                //    emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width) }));
-                //    quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
-                //}
-
-                //for (int i = 0; i < cleanContent.Length; i++)
-                //{
-                //    if (i >= indices.Count)
-                //        break;
-
-                //    var emoji = emojis[i];
-                //    if (emoji is null)
-                //        continue;
-
-                //    var bounds = allGlyphs[i];
-                //    var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
-                //    emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width) }));
-                //    quoteBaseplate.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
-                //}
-
-                //int stringToGlyphOffset = 0;
                 var emojiEnumerator = emojis.GetEnumerator();
                 while (emojiEnumerator.Current is null)
                     emojiEnumerator.MoveNext();
@@ -278,13 +210,14 @@ internal static partial class Quoter
                         continue;
                     }
 
-                    var brush = new SolidBrush(Color.White);
-                    //quoteBeforeText.Mutate(x => x.Skew(20, 10));
+                    
+                    // Draw the original image back into the output image so the placeholder emoji doesn't bleed through custom emojis with transparency
                     var emojiRect = new Rectangle((int)bounds.Bounds.X, (int)bounds.Bounds.Y, (int)bounds.Bounds.Width, (int)bounds.Bounds.Width);
                     var rebackRect = new RectangleF((int)Math.Floor(bounds.Bounds.X), (int)Math.Floor(bounds.Bounds.Y), (int)Math.Ceiling(bounds.Bounds.Width) + 1, (int)Math.Ceiling(bounds.Bounds.Width) + 1);
                     ImageBrush brushImage = new(quoteBeforeText, rebackRect);
                     quoteAfterText.Mutate(x => x.Fill(brushImage, rebackRect));
 
+                    // Pad the emoji so it doesn't get placed off-center when drawn
                     if (emoji.Height < emoji.Width)
                     {
                         emoji = emoji.Clone(x => x.Pad(emoji.Width, emoji.Width));
@@ -293,8 +226,11 @@ internal static partial class Quoter
                     {
                         emoji = emoji.Clone(x => x.Pad(emoji.Height, emoji.Height));
                     }
+                    
+                    // Resize the emoji so it takes up the entire allotted space
                     emoji.Mutate(x => x.Resize(new ResizeOptions() { Mode = ResizeMode.Max, Size = new Size(emojiRect.Width, emojiRect.Width), Position = AnchorPositionMode.Center }));
 
+                    // only now can we actually draw the emoji
                     quoteAfterText.Mutate(x => x.DrawImage(emoji, emojiRect.Location, 1));
 
                     emojiEnumerator.MoveNext();
@@ -314,7 +250,7 @@ internal static partial class Quoter
         return Quotify(img, name, cleanContent, msg.Timestamp.Year, subtext, media, glyphReplacer: emojiDrawer);
     }
 
-    static async Task<List<Image?>> FetchCustomEmojis(List<Match> matches)
+    private static async Task<List<Image?>> FetchCustomEmojis(List<Match> matches)
     {
         List<Image?> images = new(matches.Count);
         foreach (Match emojiMatch in matches)
@@ -346,12 +282,12 @@ internal static partial class Quoter
         return images;
     }
 
-    static IEnumerable<int> GetIndicesOf(string str, string substr)
+    private static IEnumerable<int> GetIndicesOf(string str, string substr)
     {
         int idx = 0;
         while (true)
         {
-            idx = str.IndexOf(substr, idx);
+            idx = str.IndexOf(substr, idx, StringComparison.Ordinal);
             if (idx == -1)
                 yield break;
             yield return idx;
@@ -359,7 +295,8 @@ internal static partial class Quoter
         }
     }
 
-    static string QuickCleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
+    [SuppressMessage("ReSharper", "ConvertToLocalFunction")]
+    private static string QuickCleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
     {
         string cleanContent = msg.Content;
         MatchEvaluator userMentionEvaluator = match => ReplaceIdWithUser(match, clint, guild);
@@ -367,6 +304,9 @@ internal static partial class Quoter
 
         MatchEvaluator channelMentionEvaluator = match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild);
         cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
+        
+        MatchEvaluator roleMentionEvaluator = match => ReplaceIdWithRole(match, clint, guild);
+        cleanContent = RoleMention.Replace(cleanContent, roleMentionEvaluator);
 
         cleanContent = CustomEmoji.Replace(cleanContent, ":$1:");
 
@@ -378,7 +318,7 @@ internal static partial class Quoter
         return cleanContent;
     }
 
-    static string ReplaceIdWithUser(Match match, DiscordClient clint, DiscordGuild? guild)
+    private static string ReplaceIdWithUser(Match match, DiscordClient clint, DiscordGuild? guild)
     {
         ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         string? name;
@@ -409,7 +349,7 @@ internal static partial class Quoter
         else return $"@{name}";
     }
 
-    static string ReplaceIdWithRole(Match match, DiscordClient clint, DiscordGuild? guild)
+    private static string ReplaceIdWithRole(Match match, DiscordClient clint, DiscordGuild? guild)
     {
         if (guild is null)
             return "@Role";
@@ -420,15 +360,16 @@ internal static partial class Quoter
         {
             name = guild.GetRoleAsync(id).GetAwaiter().GetResult().Name;
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
-        // to date i dont think name has been null, this should be fine
-        if (name is null)
-            return "@Role";
-        else return $"@{name}";
+        // to date i don't think name has been null, this should be fine
+        return name is null ? "@Role" : $"@{name}";
     }
 
-    static string ReplaceIdWithChannel(Match match, DiscordClient clint, DiscordGuild? guild)
+    private static string ReplaceIdWithChannel(Match match, DiscordClient clint, DiscordGuild? guild)
     {
         if (guild is null)
             return "#channel";
@@ -448,11 +389,9 @@ internal static partial class Quoter
             //DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
             //name = user?.GlobalName ?? user?.Username;
         }
-        
-        // to date i dont think name has been null, this should be fine
-        if (name is null)
-            return "#channel";
-        else return $"#{name}";
+
+        // to date i don't think name has been null, this should be fine
+        return name is null ? "#channel" : $"#{name}";
     }
 
     public delegate void GlyphReplacer((Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) quoteImages, ReadOnlySpan<GlyphBounds> allGlyphs, FontRectangle textblockBounds, int lineCount);
@@ -460,91 +399,68 @@ internal static partial class Quoter
     public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null,
         int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
     {
-        if (media is null || media.Frames.Count == 1)
+        if ((media?.Frames.Count ?? 0) > 1 || pfp.Frames.Count < 1)
         {
-            return QuotifyFrame(pfp, name, quote, year, extraText, media, width, height,
+            return QuotifyAnimated(pfp, name, quote, year, extraText, media, width, height,
                 pfpSize, glyphReplacer);
         }
         else
         {
-            return QuotifyAnimated(pfp, name, quote, year, extraText, media, width, height,
+            return QuotifyFrame(pfp, name, quote, year, extraText, media, width, height,
                 pfpSize, glyphReplacer);
         }
     }
     
     public static Image QuotifyAnimated(Image pfp, string name, string quote, int year, string extraText,
-        Image media, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
+        Image? media, int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
     {
         Image outputGif = QuotifyFrame(pfp, name, quote, year, extraText, media, width, height, pfpSize,
             glyphReplacer);
+        
         outputGif.Metadata.GetGifMetadata().RepeatCount = 0;
-        outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay
-            = media.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
-        
-#if false
-        ImageFrame[] frames = new ImageFrame[media.Frames.Count];
-        var loopRes = Parallel.For(0, media.Frames.Count, (i, state) =>
+
+        if (media is not null && media.Frames.Count > 1)
         {
-            Logger.Put($"Working on frame idx {i} (of {media.Frames.Count})");
-            // this is inefficient as FUCK but i DONT CARE!!!!!
-            Image frameColor = QuotifyFrame(pfp, name, quote, year, extraText, media.Frames.ExportFrame(i), width,
-                height,
-                pfpSize, glyphReplacer);
-
-            var delayTime = media.Frames[i].Metadata.GetGifMetadata().FrameDelay;
-            var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
-            newFrameMetadata.FrameDelay = delayTime;
-
-            // outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
-            frames[i] = frameColor.Frames.RootFrame;
-        });
-
-        while (!loopRes.IsCompleted)
-        {
-        }
-
-        foreach (var frame in frames)
-        {
-            outputGif.Frames.AddFrame(frame);
-        }
-#else
-        
-        // for (int i = media.Frames.Count - 1; i >= 0; i--)
-        // for (int i = 0; i < media.Frames.Count; i++)
-        while (media.Frames.Count > 1)
-        {
-            int i = 0;
-            // this is inefficient as FUCK but i DONT CARE!!!!!
-            Image currFrame = media.Frames.ExportFrame(i);
-            Image frameColor = QuotifyFrame(pfp, name, quote, year, extraText, currFrame, width, height, pfpSize,
-                glyphReplacer);
-
-             
-            var delayTime = currFrame.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+            outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay
+                = media.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
             
-            // first frame is a bitch and makes me want to kill my self.
-            // if (outputGif.Frames.Count == 1)
-            // {
-            //     outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = delayTime;
-            //     // outputGif.Frames.RootFrame.Metadata.GetGifMetadata().DisposalMethod =
-            //     //     GifDisposalMethod.RestoreToBackground;
-            //     // ImageBrush brush = new ImageBrush(frameColor);
-            //     outputGif.Mutate(x => x.DrawImage(frameColor, 1));
-            //     // outputGif.
-            //     continue;
-            // }
+            while (media.Frames.Count > 1)
+            {
+                int i = 0;
+                // this is inefficient as FUCK but i DONT CARE!!!!!
+                Image currFrame = media.Frames.ExportFrame(i);
+                Image frameColor = QuotifyFrame(pfp, name, quote, year, extraText, currFrame, width, height, pfpSize,
+                    glyphReplacer);
 
-            var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
-            // newFrameMetadata.DisposalMethod = GifDisposalMethod.NotDispose;
-            newFrameMetadata.FrameDelay = delayTime;
-
-            // outputGif.Frames.InsertFrame(0, frameColor.Frames.RootFrame);
-            outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
-            // if (i == 0)
-            //     outputGif.Frames.RemoveFrame(0);
+                 
+                var delayTime = currFrame.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+                var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
+                newFrameMetadata.FrameDelay = delayTime;
+                
+                outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
+            }
         }
-#endif
+        else if (pfp.Frames.Count > 1)
+        {
+            outputGif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay
+                = pfp.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+            
+            while (pfp.Frames.Count > 1)
+            {
+                int i = 0;
+                // this is inefficient as FUCK but i DONT CARE!!!!!
+                Image currFrame = pfp.Frames.ExportFrame(i);
+                Image frameColor = QuotifyFrame(currFrame, name, quote, year, extraText, media, width, height, pfpSize,
+                    glyphReplacer);
+                
+                var delayTime = currFrame.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay;
+                var newFrameMetadata = frameColor.Frames.RootFrame.Metadata.GetGifMetadata();
+                newFrameMetadata.FrameDelay = delayTime;
 
+                outputGif.Frames.AddFrame(frameColor.Frames.RootFrame);
+            }
+        }
+        
         // first frame is blank from creation. remove it.
         // outputGif.Frames.RemoveFrame(0);
         return outputGif;
@@ -558,7 +474,6 @@ internal static partial class Quoter
         int pfpDistToTop = (height - pfpSize) / 2;
         float marginY = height * 0.25f, marginX = 50, bottomToPfpMargin = (height - pfpSize) / 2f;
         const float NAME_FONT_SIZE = 36;
-
 
         Image<Rgba32> quoteBaseplate = new(width, height);
         var config = quoteBaseplate.Configuration;
@@ -620,7 +535,6 @@ internal static partial class Quoter
                 lgbt = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaTopLeft.X, mediaTopLeft.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
                 lgbtq = new(new Point(mediaBottomRight.X, mediaBottomRight.Y), new Point(mediaTopLeft.X, mediaTopLeft.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
                 lgbtqia = new(new Point(mediaBottomRight.X, mediaTopLeft.Y), new Point(mediaTopLeft.X, mediaBottomRight.Y), GradientRepetitionMode.None, blackStart, transparentEnd);
-
 
                 quoteBaseplate.Mutate(x => x.Fill(lgbt, mediaRect));
                 quoteBaseplate.Mutate(x => x.Fill(lgbtq, mediaRect));
@@ -730,6 +644,7 @@ internal static partial class Quoter
             VerticalAlignment = VerticalAlignment.Top
         };
 
+        // Shrink the attribution text until it fits in the main content area
         while (TextMeasurer.MeasureBounds(nameTxt, usernameOptions).Width > pfpSize - marginX)
         {
             usernameFont = new(usernameFont, usernameFont.Size * 0.9f);
@@ -742,9 +657,9 @@ internal static partial class Quoter
         return quoteBaseplate;
     }
 
-    private static string GetReplyString(DiscordMessage refMsg, DiscordClient clint, DiscordGuild? guild)
+    private static string GetReplyString(DiscordMessage? refMsg, DiscordClient clint, DiscordGuild? guild)
     {
-        if (refMsg is null || refMsg.Author is null) return "";
+        if (refMsg?.Author is null) return "";
         if (Config.values.blockedUsers.Contains(refMsg.Author.Id)) return "";
         if (refMsg.MessageType != DiscordMessageType.Reply && refMsg.MessageType != DiscordMessageType.Default) return "";
         
@@ -755,21 +670,14 @@ internal static partial class Quoter
             if (refMsg.Attachments.Count != 0)
             {
                 string mimeType = refMsg.Attachments[0].MediaType?.Split("/")[0] ?? "";
-                string attachmentFile;
                 string anA = mimeType[0] switch
                 {
-                    var x when
-                    x == 'a' ||
-                    x == 'e' ||
-                    x == 'i' ||
-                    x == 'o' ||
-                    x == 'u' => "an",
+                    'a' or 'e' or 'i' or 'o' or 'u' => "an",
                     _ => "a"
                 };
-
-                if (mimeType == "image" || mimeType == "video" || mimeType == "audio")
-                    attachmentFile = mimeType;
-                else attachmentFile = $"file named \"{refMsg.Attachments[0].FileName}\"";
+                string attachmentFile = mimeType is "image" or "video" or "audio"
+                    ? mimeType
+                    : $"file named \"{refMsg.Attachments[0].FileName}\"";
 
                 return $"Replying to {anA} {attachmentFile} from {GetAuthorString(refMsg)}";
             }
@@ -798,7 +706,7 @@ internal static partial class Quoter
         return msg.Author.GlobalName ?? msg.Author.Username;
     }
 
-    static string Shorten(string str, int maxLength = 150)
+    private static string Shorten(string str, int maxLength = 150)
     {
         str = str.Trim();
         if (str.Length > maxLength) return str[..(maxLength - 3)] + "...";

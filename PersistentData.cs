@@ -58,7 +58,7 @@ internal class PersistentData
         Console.WriteLine("Initializing persistent data storage");
         if (!File.Exists(PD_PATH))
         {
-            File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(new PersistentData())); // mmm triple parenthesis, v nice
+            File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(new PersistentData(), Formatting.Indented)); // mmm triple parenthesis, v nice
         }
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => WritePersistentData();
@@ -83,7 +83,7 @@ internal class PersistentData
     public static void WritePersistentData()
     {
         Logger.Put($"Writing persistent data to disk.", LogType.Debug);
-        File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(values));
+        File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(values, Formatting.Indented));
         PersistentDataChanged?.Invoke();
     }
 }
