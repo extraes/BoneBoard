@@ -31,7 +31,12 @@ class Program
         string cleanInvocation = $"{cleanProc.StartInfo.FileName} {cleanProc.StartInfo.Arguments} [in {projFolder}]";
         cleanProc.Start();
         cleanProc.WaitForExit();
-        cleanOutput = cleanProc.StandardOutput.ReadToEnd();
+        string[] cleanLines = cleanProc.StandardOutput.ReadToEnd().Replace(projFolder, "$PWD").Split(Environment.NewLine);
+        string[] cleanLinesWithoutDeletions =
+            cleanLines.Where(str => !(str.Contains("Deleting file") && str.Contains(".dll"))).ToArray();
+        string deletedFiles = $"*Not shown: {cleanLines.Length - cleanLinesWithoutDeletions.Length} DLL deletions*";
+        cleanOutput = string.Join(Environment.NewLine, cleanLinesWithoutDeletions) + "\n" + deletedFiles;
+        
         
         string dotnetBuildOutput;
         Process proc = new()
@@ -49,7 +54,7 @@ class Program
         
         proc.Start();
         proc.WaitForExit();
-        dotnetBuildOutput = proc.StandardOutput.ReadToEnd();
+        dotnetBuildOutput = proc.StandardOutput.ReadToEnd().Replace(projFolder, "$PWD");
 
         proc = new()
         {
