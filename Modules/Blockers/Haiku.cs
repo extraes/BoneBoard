@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
@@ -105,9 +106,8 @@ internal class Haiku : ModuleBase
             else
                 openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
         }
-        
-        var clint = openAiClient.GetOpenAIResponseClient(Config.values.haikuAiModel);
         var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
+        var clint = openAiClient.GetChatClient(Config.values.haikuAiModel);
         // determine effort first because 4o is a cheaper, non-reasoning model, lol
         ChatMessage[] messages =
         [
@@ -120,103 +120,37 @@ internal class Haiku : ModuleBase
             Logger.Put($"Why is the LLM giving me a non-assistant response? Why is the {effortRes.Value.Role} yapping?? Why's it saying {effortRes.Value.Content.SelectMany(c => c.Text)}");
         }
 
-        foreach (ChatMessageContentPart part in effortRes.Value.Content)
+        if (effortRes.Value.Content.Any(c => c.Text == "No"))
         {
-            switch (part.Kind)
+            await TryDeleteAsync(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
+            reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
+            try
             {
-                case ChatMessageContentPartKind.Text:
-                    if (part.Text == "No")
-                    {
-                        await TryDeleteAsync(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
-                        reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
-                        try
-                        {
-                            if (msg.Author is DiscordMember member)
-                                await member.TimeoutAsync(DateTime.Now.AddMinutes(30), "you disappoint me | that was a shit haiku bro | thirty minute blast.");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Warn($"Exception while timing out the author of a shit haiku ({msg.Author})", ex);
-                        }
-                        // too late to mark the 
-                        return;
-                    }
-                    break;
-                default:
-                    break;
+                if (msg.Author is DiscordMember member)
+                    await member.TimeoutAsync(DateTime.Now.AddMinutes(30), "you disappoint me | that was a shit haiku bro | thirty minute blast.");
             }
-        }
-
-        // ok now do reasoning
-        var options = new ResponseCreationOptions()
-        {
-            ReasoningOptions = new(ResponseReasoningEffortLevel.Medium) // I've seen a case of low-effort reasoning straight *forgetting* a word when counting, like bro
+            catch (Exception ex)
             {
-                //ReasoningSummaryVerbosity =  ResponseReasoningSummaryVerbosity.Detailed
-            }, 
-            Instructions = Config.values.haikuSystemPrompt,
-        };
-
-        var response = await clint.CreateResponseAsync(string.Join("\n", lines[0..3]), options);
-        
-        if (response.Value.Status == ResponseStatus.Failed)
-        {
-            Logger.Warn($"Generating OpenAI syllable analysis failed: Code {response.Value.Error.Code} -- {response.Value.Error.Message}");
-            Logger.Warn($"The above error was thrown for the following content: {content}");
-
+                Logger.Warn($"Exception while timing out the author of a shit haiku ({msg.Author})", ex);
+            }
+            // too late to mark the 
             return;
         }
 
-        Logger.Put("Raw pipeline response: " + response.GetRawResponse().Content.ToString(), LogType.Debug);
-
-        string reasoningTrace = "";
-        int[] llmSyllableCounts = [];
-        foreach (ResponseItem outItem in response.Value.OutputItems)
+        int[] syllableCounts = [0, 0, 0];
+        for (var i = 0; i < syllableCounts.Length; i++)
         {
-            Logger.Put($"LLM response item: {outItem}", LogType.Debug);
-            if (outItem is ReasoningResponseItem reasoning)
-            {
-                reasoningTrace += "\n" + string.Join('\n', reasoning.SummaryTextParts);
-            }
-            else if (outItem is MessageResponseItem llmMessage)
-            {
-                if (llmMessage.Role != MessageRole.Assistant)
-                {
-                    continue;
-                }
-
-                string accumulator = "";
-
-                foreach (ResponseContentPart contentPart in llmMessage.Content)
-                {
-                    Logger.Put($"LLM content part: {contentPart.Kind} - {contentPart.Text}", LogType.Debug);
-                    switch (contentPart.Kind)
-                    {
-                        case ResponseContentPartKind.OutputText:
-                            accumulator += contentPart.Text;
-                            reasoningTrace += contentPart.Text;
-                            break;
-                        case ResponseContentPartKind.Refusal:
-                            Logger.Warn($"LLM refused to analyze message {msg.JumpLink}");
-                            return;
-                    }
-                }
-
-                Logger.Put($"LLM says '{accumulator}' to {msg}");
-
-                llmSyllableCounts = accumulator.Split("\n", StringSplitOptions.RemoveEmptyEntries)
-                    .Select(static line => { int.TryParse(line, out int lambdaRet); return lambdaRet; })
-                    .ToArray();
-
-                break;
-            }
+            var line = lines[i];
+            var stats = TextStatistics.TextStatistics.Parse(line);
+            syllableCounts[i] = (int)Math.Round(stats.WordCount * stats.AverageSyllablesPerWord);
         }
 
-        reasoningTraces[msg.Id] = reasoningTrace;
+        reasoningTraces[msg.Id] = $"Calculated text stats shows {string.Join(" / ", lines)} has {string.Join(", ", syllableCounts)} syllables.";
 
-        if (!llmSyllableCounts.SequenceEqual([5, 7, 5]))
+        if (!syllableCounts.SequenceEqual([5, 7, 5]))
         {
             TryDeleteDontCare(msg, $"message not haiku | lines do not make 5-7-5 | experience woe.");
+            return;
         }
 
         // yaaaayyyy, the message is a haiku

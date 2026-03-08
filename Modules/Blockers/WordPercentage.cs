@@ -90,11 +90,18 @@ internal partial class WordPercentage : ModuleBase
             }
         }
         
+        if (currChunkSize != 0)
+            chunkSizeLengths.Add(currChunkSize);
+        
         Logger.Put($"message {string.Join(", ", words)} has the following chunk sizes: {string.Join(", ", chunkSizeLengths)}");
 
         if (chunkSizeLengths is [1])
             return false;
+        // if there's one chunk of more than 3 words, and it's at the end
         else if (chunkSizeLengths.Count == 1 && chunkSizeLengths[0] > 3 && wordsThatCount.EndsWith(true))
+            return true;
+        // more than 3 chunks & more than half the word chunks are over 3 long
+        else if (chunkSizeLengths.Count > 3 && chunkSizeLengths.Count(c => c > 2) > (chunkSizeLengths.Count / 2))
             return true;
 
         return false;

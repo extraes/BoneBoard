@@ -17,7 +17,6 @@ class Program
         string projFolder = Path.GetDirectoryName(parms.buildProject) ?? Environment.CurrentDirectory;
         string projFile = Path.GetFileName(parms.buildProject)!;
 
-        string cleanOutput;
         Process cleanProc = new()
         {
             StartInfo = new()
@@ -35,7 +34,7 @@ class Program
         string[] cleanLinesWithoutDeletions =
             cleanLines.Where(str => !str.Contains("Deleting file")).ToArray();
         string deletedFiles = $"*Not shown: {cleanLines.Length - cleanLinesWithoutDeletions.Length} deletions*";
-        cleanOutput = string.Join(Environment.NewLine, cleanLinesWithoutDeletions) + "\n" + deletedFiles;
+        string cleanOutput = string.Join(Environment.NewLine, cleanLinesWithoutDeletions) + "\n" + deletedFiles;
         
         
         string dotnetBuildOutput;

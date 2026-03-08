@@ -92,7 +92,7 @@ internal static class Logger
 
     static string GetCaller()
     {
-        StackTrace trace = new(1, false);
+        StackTrace trace = new(3, false);
         foreach (StackFrame frame in trace.GetFrames())
         {
             MethodBase? method = frame.GetMethod();
@@ -106,10 +106,10 @@ internal static class Logger
             }
             
 
-            //if (decType != typeof(Logger) && decType != typeof(DiscordLogger) && IsTypeLoggable(decType))
-            //{
-            //    return decType.Name + '.' + method.Name;
-            //}
+            if (decType != typeof(Logger) && IsTypeLoggable(decType))
+            {
+                return decType.Name + '.' + method.Name;
+            }
         }
         return "???";
     }
