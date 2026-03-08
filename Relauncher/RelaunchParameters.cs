@@ -79,7 +79,7 @@ public record class RelaunchParameters
         if (id == default)
             return;
 
-        string buildOutput = args.First(arg => arg.StartsWith("dotnet"));
+        string buildOutput = args.First(arg => arg.Contains("dotnet build"));
         clientBuilder.ConfigureEventHandlers(x =>
             x.HandleSessionCreated((clint, sArgs) => RelaunchThunk(buildOutput, id, clint, sArgs)));
     }
