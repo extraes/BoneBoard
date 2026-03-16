@@ -1,12 +1,16 @@
 using DSharpPlus;
+using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.ContextChecks.ParameterChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 
 namespace BoneBoard.Modules.Blockers;
 
+[Command("channeltimeout")]
 internal class PerChannelTimeout(BoneBot bot) : ModuleBase(bot)
 {
-        
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs mcea)
@@ -56,5 +60,38 @@ internal class PerChannelTimeout(BoneBot bot) : ModuleBase(bot)
         
         TryDeleteDontCare(msg, "User is timed out in this channel");
         return true;
+    }
+
+    [Command("setmute")]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.ManageMessages], [DiscordPermission.ModerateMembers])]
+    public async Task Timeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member, TimeSpan duration)
+    {
+        if (!PersistentData.values.channelTimeoutEndTimes.TryGetValue(ctx.Channel.Id, out var userEndTimesInChannel))
+        {
+            userEndTimesInChannel = [];
+            PersistentData.values.channelTimeoutEndTimes[ctx.Channel.Id] = userEndTimesInChannel;
+        }
+
+        userEndTimesInChannel[member.Id] = DateTime.Now + duration;
+
+        await ctx.RespondAsync($"Got it! They'll be unmuted {Formatter.Timestamp(userEndTimesInChannel[member.Id])}", true);
+    }
+    
+    
+    [Command("unmute")]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.ManageMessages], [DiscordPermission.ModerateMembers])]
+    public async Task Untimeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member)
+    {
+        if (!PersistentData.values.channelTimeoutEndTimes.TryGetValue(ctx.Channel.Id, out var userEndTimesInChannel))
+        {
+            userEndTimesInChannel = [];
+            PersistentData.values.channelTimeoutEndTimes[ctx.Channel.Id] = userEndTimesInChannel;
+        }
+
+        userEndTimesInChannel[member.Id] = DateTime.Now - TimeSpan.FromDays(1);
+
+        await ctx.RespondAsync($"Got it! They're now unmuted!", true);
     }
 }
