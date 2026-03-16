@@ -8,10 +8,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class CustomEmojisAndStickers : ModuleBase
+internal class CustomEmojisAndStickers(BoneBot bot) : ModuleBase(bot)
 {
-    public CustomEmojisAndStickers(BoneBot bot) : base(bot) { }
-
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageReactionAddedEventArgs rxnArgs)

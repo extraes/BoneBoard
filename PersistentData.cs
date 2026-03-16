@@ -53,6 +53,8 @@ internal class PersistentData
 
     public List<string> stickiedMessages = new();
     
+    public Dictionary<ulong, Dictionary<ulong, DateTime>> channelTimeoutEndTimes = new(); // channel id -> user id -> expiry time
+    
     static PersistentData()
     {
         Console.WriteLine("Initializing persistent data storage");

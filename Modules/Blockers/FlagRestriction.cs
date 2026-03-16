@@ -9,10 +9,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class FlagRestriction : ModuleBase
+internal class FlagRestriction(BoneBot bot) : ModuleBase(bot)
 {
-    public FlagRestriction(BoneBot bot) : base(bot) { }
-
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageReactionAddedEventArgs rxnArgs)

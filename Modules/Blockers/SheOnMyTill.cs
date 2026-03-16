@@ -9,10 +9,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class SheOnMyTill : ModuleBase
+internal class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
 {
-    public SheOnMyTill(BoneBot bot) : base(bot) { }
-
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs mcea)
@@ -52,7 +50,7 @@ internal class SheOnMyTill : ModuleBase
             {
                 string fullFormat = string.Join(" [...] ", Config.values.theFormatInQuestion);
 
-                TryDeleteDontCare(msg, $"Does not conform to {fullFormat}");
+                TryDeleteDontCare(msg, $"Does not conform to: {fullFormat}");
                 return true;
             }
 

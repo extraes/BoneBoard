@@ -17,10 +17,8 @@ namespace BoneBoard.Modules;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("imageroyale")]
-internal class ImageRoyale : ModuleBase
+internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
 {
-    public ImageRoyale(BoneBot bot) : base(bot) { }
-
     [ThreadStatic] static HttpClient? _clint;
     static HttpClient Clint
     {

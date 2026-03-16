@@ -75,6 +75,7 @@ internal class BoneBot
         blockers =
         [
             new ModeratorIgnore(this),
+            new PerChannelTimeout(this),
             new Reslow(this),
             new CustomEmojisAndStickers(this),
             new FlagRestriction(this),

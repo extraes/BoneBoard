@@ -8,10 +8,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class MustStartWith : ModuleBase
+internal class MustStartWith(BoneBot bot) : ModuleBase(bot)
 {
-    public MustStartWith(BoneBot bot) : base(bot) { }
-
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)

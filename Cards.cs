@@ -137,16 +137,10 @@ internal static class Cards
         King = 'K',
     }
 
-    public class Card
+    public class Card(Suit suit, Rank rank)
     {
-        public Suit Suit { get; }
-        public Rank Rank { get; }
-
-        public Card(Suit suit, Rank rank)
-        {
-            Suit = suit;
-            Rank = rank;
-        }
+        public Suit Suit { get; } = suit;
+        public Rank Rank { get; } = rank;
 
         // for serialization
         public override string ToString()

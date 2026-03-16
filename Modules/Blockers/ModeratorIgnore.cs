@@ -19,7 +19,7 @@ namespace BoneBoard.Modules.Blockers;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("starignore")]
-internal class ModeratorIgnore : ModuleBase
+internal class ModeratorIgnore(BoneBot bot) : ModuleBase(bot)
 {
     static CircularBuffer<ulong> ignoredMessages = new(128);
     static int eventsProcessed = 0;
@@ -37,7 +37,6 @@ internal class ModeratorIgnore : ModuleBase
         public int? ignoreCount;
     }
 
-    public ModeratorIgnore(BoneBot bot) : base(bot) { }
     static Dictionary<DiscordUser, IgnoreData> ignoreCounts = new();
 
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)

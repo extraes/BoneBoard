@@ -9,10 +9,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class NoVowels : ModuleBase
+internal class NoVowels(BoneBot bot) : ModuleBase(bot)
 {
-    public NoVowels(BoneBot bot) : base(bot) { }
-
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
 
-internal partial class MessageBuffer : ModuleBase
+internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
 {
     const long DEFAULT_FILE_SIZE_LIMIT = 10 * 1000 * 1000; // 10MB
     static readonly Dictionary<DiscordPremiumTier, long> FileSizeLimits = new()
@@ -28,8 +28,6 @@ internal partial class MessageBuffer : ModuleBase
     Dictionary<string, string> cachedQueuedAttachmentPaths = new();
     HttpClient attachmentDownloadClient = new();
 
-
-    public MessageBuffer(BoneBot bot) : base(bot) { }
 
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {

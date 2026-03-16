@@ -9,10 +9,8 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal partial class WordPercentage : ModuleBase
+internal partial class WordPercentage(BoneBot bot) : ModuleBase(bot)
 {
-    public WordPercentage(BoneBot bot) : base(bot) { }
-
     private static readonly Regex Whitespace = WhitespaceRegex();
     internal static readonly Regex Link = LinkRegex();
     

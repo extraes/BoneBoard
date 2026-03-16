@@ -41,12 +41,8 @@ internal partial class WikiTopic
         }
     }
 
-    public class PageviewRequest : WikiRequestMessage
+    public class PageviewRequest(string? id) : WikiRequestMessage(id)
     {
-        public PageviewRequest(string? id) : base(id)
-        {
-        }
-
         public override HttpContent GetHttpContent()
         {
             return new StringContent("");

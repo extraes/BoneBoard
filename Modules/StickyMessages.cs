@@ -10,12 +10,10 @@ using DSharpPlus.EventArgs;
 namespace BoneBoard.Modules;
 
 [Command("sticky")]
-internal class StickyMessages : ModuleBase
+internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
 {
     private static List<DiscordMessage> needRecache = [];
     private static List<DiscordMessage> stickyMessages = [];
-
-    public StickyMessages(BoneBot bot) : base(bot) { }
 
     protected override async Task FetchGuildResources()
     {

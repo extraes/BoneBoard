@@ -19,7 +19,7 @@ namespace BoneBoard.Modules;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("frog")]
-internal class FrogRole : ModuleBase
+internal class FrogRole(BoneBot bot) : ModuleBase(bot)
 {
     private DiscordRole? frogRole;
     private DiscordMessage? frogMsg;
@@ -28,9 +28,6 @@ internal class FrogRole : ModuleBase
     private volatile bool assigningNewKing;
 
     private Task? leaderboardTask;
-
-    public FrogRole(BoneBot bot) : base(bot)
-    { }
 
     protected override async Task FetchGuildResources()
     {

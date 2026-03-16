@@ -19,7 +19,7 @@ namespace BoneBoard;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("hang")]
-internal partial class Hangman : ModuleBase
+internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
 {
     const string VOWELS = "aeiou";
     string[] possibleWords = Array.Empty<string>();
@@ -44,13 +44,10 @@ internal partial class Hangman : ModuleBase
         DiscordEmoji.FromUnicode("✅"),
     };
 
-    public Hangman(BoneBot bot) : base(bot)
-    {
-        //bot.ConfigureEvents(e =>
-        //{
-        //    e.HandleMessageCreated(HandleHangman);
-        //});
-    }
+    //bot.ConfigureEvents(e =>
+    //{
+    //    e.HandleMessageCreated(HandleHangman);
+    //});
 
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {

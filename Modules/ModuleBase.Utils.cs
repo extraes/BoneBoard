@@ -13,10 +13,13 @@ namespace BoneBoard.Modules;
 internal partial class ModuleBase
 {
     [DebuggerStepThrough]
-    protected async void TryDeleteDontCare(DiscordMessage msg, string? reason = null)
+    protected async void TryDeleteDontCare(DiscordMessage? msg, string? reason = null)
     {
         try
         {
+            if (msg is null)
+                return;
+            
             if (reason is not null)
                 Logger.Put($"Deleting message {msg} for reason '{reason}'");
             await msg.DeleteAsync(reason);
@@ -33,10 +36,16 @@ internal partial class ModuleBase
     }
     
     [DebuggerStepThrough]
-    protected async Task<bool> TryDeleteAsync(DiscordMessage msg, string? reason = null)
+    protected async Task<bool> TryDeleteAsync(DiscordMessage? msg, string? reason = null)
     {
         try
         {
+            if (msg is null)
+            {
+                Logger.Warn("Can't delete a null message");
+                return false;
+            }
+            
             if (reason is not null)
                 Logger.Put($"Deleting message {msg} for reason '{reason}'");
             await msg.DeleteAsync(reason);
