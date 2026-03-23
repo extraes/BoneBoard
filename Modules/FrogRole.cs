@@ -97,44 +97,15 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
         Logger.Error("Failed to fetch message link @ " + Config.values.frogMessageLink);
     }
 
-    public async Task FetchFrogLeaderboardMsg()
+    private async Task FetchFrogLeaderboardMsg()
     {
         if (!Config.values.frogLeaderboardLink.Contains("/channels/"))
             return;
 
-        ulong? frogMsgChannel = null;
-        ulong? frogMsgId = null;
-
-        string[] idStrings = Config.values.frogLeaderboardLink.Split("/channels/");
-        ulong[] ids = idStrings[1].Split('/').Skip(1).Select(ulong.Parse).ToArray();
-        if (ids.Length >= 2)
-        {
-            frogMsgChannel = ids[0];
-            frogMsgId = ids[1];
-        }
-
-        if (!frogMsgId.HasValue || !frogMsgChannel.HasValue)
-            return;
-
-        foreach (DiscordGuild guild in bot.client.Guilds.Values)
-        {
-            if (guild.Channels.TryGetValue(frogMsgChannel.Value, out DiscordChannel? dCh))
-            {
-                frogLeaderboardMsg = await TryFetchMessage(dCh, frogMsgId.Value);
-                return;
-            }
-
-            foreach (DiscordThreadChannel? thread in guild.Channels.SelectMany(chp => chp.Value.Type == DiscordChannelType.Text ? chp.Value.Threads : Enumerable.Empty<DiscordThreadChannel>()))
-            {
-                if (thread.Id == frogMsgChannel.Value)
-                {
-                    frogLeaderboardMsg = await TryFetchMessage(thread, frogMsgId.Value);
-                    return;
-                }
-            }
-        }
-
-        Logger.Error("Failed to fetch message link @ " + Config.values.frogMessageLink);
+        frogLeaderboardMsg = await bot.GetMessageFromLink(Config.values.frogLeaderboardLink);
+        
+        if (frogLeaderboardMsg is null)
+            Logger.Error("Failed to fetch message link @ " + Config.values.frogMessageLink);
     }
 
     protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
@@ -263,17 +234,23 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
 
             //guild.RequestMembersAsync
 
-            if (frogKing is null || !frogKing.Roles.Any(r => r.Id == Config.values.frogRole))
+            if (frogKing is null || frogKing.Roles.All(r => r.Id != Config.values.frogRole))
             {
-                Logger.Warn($"Fetching all members of {guild.Name} because {(frogKing is null ? "there's no saved frog king" : $"the frog king '{frogKing.DisplayName}' didn't have the frog role")}");
-
-                await foreach (DiscordMember memberson in guild.GetAllMembersAsync())
+                var roleMemberCounts = await guild.GetRoleMemberCountsAsync();
+                if (roleMemberCounts.TryGetValue(Config.values.frogRole, out var frogKingCount) && frogKingCount != 0)
                 {
-                    if (!memberson.Roles.Any(r => r.Id == Config.values.frogRole))
-                        continue;
+                    Logger.Warn($"Fetching all members of {guild.Name} because {(frogKing is null ? "there's no saved frog king" : $"the frog king '{frogKing.DisplayName}' didn't have the frog role")}");
+                    
+                    if (Config.values.frogMessageBase.Contains("{0}") && frogMsg is not null)
+                        await frogMsg.ModifyAsync(string.Format(Config.values.frogMessageBase, "*Hold on, fetching all members, this is gonna take a while...*"));
+                    await foreach (DiscordMember memberson in guild.GetAllMembersAsync())
+                    {
+                        if (memberson.Roles.All(r => r.Id != Config.values.frogRole))
+                            continue;
 
-                    Logger.Put($" - {memberson.DisplayName} has the frog role, removing it.", LogType.Debug);
-                    await memberson.RevokeRoleAsync(frogRole, "Resetting frog roles to assign new 'frog king'");
+                        Logger.Put($" - {memberson.DisplayName} has the frog role, removing it.", LogType.Debug);
+                        await memberson.RevokeRoleAsync(frogRole, "Resetting frog roles to assign new 'frog king'");
+                    }
                 }
             }
             else await frogKing.RevokeRoleAsync(frogRole, "Revoking role to assign new 'frog king'");
@@ -387,7 +364,7 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
     [Description("Creates the message that must be reacted to for KOTF (King of the Frog)")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task CreateFrogMessage(
+    public async Task CreateFrogMessage(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
         [Description("The text content of the message. Use {0} to for curr king.")]
@@ -414,7 +391,7 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
     [Description("Set the text that will be displayed when someone tries to get the frog role when it's not available.")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task SetFrogUnavailableText(
+    public async Task SetFrogUnavailableText(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
         [Description("The text content of the message. Use {0} to for curr king, and {1} available day of week.")]
@@ -434,7 +411,7 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
     [Description("Creates the message that must be reacted to for KOTF (King of the Frog)")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task CreateFrogLeaderboardMsg(
+    public async Task CreateFrogLeaderboardMsg(
         SlashCommandContext ctx,
         [Parameter("msgContent")]
         [Description("Use {0} to indicate where the leaderboard goes (Will be surrounded by multilines)")]
@@ -459,7 +436,7 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
     [Description("Remove user from frog role leaderboard. De-role/block/ban them before use.")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task RemoveUserFromLeaderboard(
+    public async Task RemoveUserFromLeaderboard(
         SlashCommandContext ctx,
         [Parameter("user")]
         [Description("Whose ID to remove from the leaderboard. Won't trigger leaderboard refresh.")]
@@ -483,5 +460,23 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
         PersistentData.WritePersistentData();
 
         await ctx.RespondAsync(wasInData ? "Removed that user from the frog leaderboard." : "That user wasn't in the leaderboard (yet?).", true);
+    }
+    
+    
+    [Command("clearLeaderboard")]
+    [Description("Clears the frog role leaderboard, doesn't refresh the msg yet tho")]
+    [RequireGuild]
+    [RequirePermissions([DiscordPermission.AddReactions, DiscordPermission.ManageMessages], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public async Task ClearLeaderboard(
+        SlashCommandContext ctx
+    )
+    {
+        if (await SlashCommands.ModGuard(ctx))
+            return;
+
+        PersistentData.values.frogRoleTimes.Clear();
+        PersistentData.WritePersistentData();
+
+        await ctx.RespondAsync("Got it!", true);
     }
 }
