@@ -23,10 +23,15 @@ internal class Config
 
     public string quoteFont = "Comfortaa";
 
-    public ulong[] blockedUsers = Array.Empty<ulong>();
-    public ulong[] owners = Array.Empty<ulong>();
-    public ulong[] requiredRoles = Array.Empty<ulong>();
-    public ulong[] requiredEmojis = Array.Empty<ulong>();
+    
+    public string[] ignoreDiscordLogsWith = [ "unknown event" ];
+    public string[] ignoreDiscordLogsFrom = [ "HttpClient" ];
+    public bool logDiscordDebug = false;
+    
+    public ulong[] blockedUsers = [];
+    public ulong[] owners = [];
+    public ulong[] requiredRoles = [];
+    public ulong[] requiredEmojis = [];
     public int requiredReactionCount = 3;
     [TomlInlineComment("https://discord.com/channels/563139253542846474/1153819135067832370/1283700275617468416")]
     public string quoteeDeleteEmoji = "emoji id, like 1283700275617468416";
@@ -54,35 +59,35 @@ internal class Config
     public ConfessionalRequirements confessionalRestrictions = ConfessionalRequirements.ROLE | ConfessionalRequirements.COOLDOWN;
 
     public double bufferTimeMinutes = 6 * 60; // 6 hours
-    public ulong[] bufferExemptRoles = Array.Empty<ulong>();
+    public ulong[] bufferExemptRoles = [];
 
     public string hangmanMessageLink = "";
     public string hangmanMessageFormat = "";
     [TomlPrecedingComment("Supplementary words to the wordsource")]
-    public string[] hangmanWords = Array.Empty<string>();
+    public string[] hangmanWords = [];
     public string hangmanWordSource = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt";
     public string wordSourceSeparator = "\n";
 
-    public ulong[] casinoRoleIds = Array.Empty<ulong>();
+    public ulong[] casinoRoleIds = [];
 
     public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromMedia = new() { { "1", [2, 3] } };
     [TomlPrecedingComment("includes stickers & rxns")]
     public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromCustomEmojis = new() { { "1", [2, 3] } };
     public Dictionary<string, string[]> channelsWhereAllFlagsButListedAreProhibited = new() { { "1", ["2", "3"] } };
-    public ulong[] channelsWhereNoVowelsAreAllowed = Array.Empty<ulong>();
+    public ulong[] channelsWhereNoVowelsAreAllowed = [];
 
-    public ulong[] channelsWhereMessagesMustHaveMinPercOfAWord = Array.Empty<ulong>();
+    public ulong[] channelsWhereMessagesMustHaveMinPercOfAWord = [];
     [TomlPrecedingComment("Don't include quotation marks or apostrophes")]
-    public string[] theWordOrWords = Array.Empty<string>();
+    public string[] theWordOrWords = [];
     public float wordPercentage = 0.05f;
 
-    public ulong[] channelsWhereMessagesMustStartWith = Array.Empty<ulong>();
-    public string[] possibleMessageStarts = Array.Empty<string>();
+    public ulong[] channelsWhereMessagesMustStartWith = [];
+    public string[] possibleMessageStarts = [];
 
-    public ulong[] channelsWhereMessagesMustConformToFormat = Array.Empty<ulong>();
+    public ulong[] channelsWhereMessagesMustConformToFormat = [];
     public string[] theFormatInQuestion = [ "she", "on my", "till i" ];
 
-    public ulong[] channelsWhereMessagesMustBeHaikus = Array.Empty<ulong>();
+    public ulong[] channelsWhereMessagesMustBeHaikus = [];
     public string haikuAiModel = "o4-mini"; // non-reasoning models suck dick at counting syllables, lol -- this may get expensive for moderators but oh well, i guess ill find out huh
     public string haikuSystemPrompt = "For each line of input, count the number of syllables and output that number on a new line. Only respond with the numbers, do not include any other text.";
     public string haikuEffortModel = "gp-4o";
@@ -106,11 +111,11 @@ internal class Config
     public string openAiConfessionRewriteModel = "gpt-4o"; // mini sucks ass at rewriting :sob: 
 
     public ulong pollsterAutoWatchForumId = 0;
-    public string[] pollsterCategories = Array.Empty<string>();
+    public string[] pollsterCategories = [];
     public int pollsterMaxVal = 5;
     public DateTime pollsterEndTime = DateTime.Now;
     public ulong roundRobinBumpForumId = 0;
-    public ulong[] roundRobinBumpIgnoreThreads = Array.Empty<ulong>();
+    public ulong[] roundRobinBumpIgnoreThreads = [];
     public string roundRobinBumpMessage = "Bump <:CamobiDog:764589139118784572>";
 
     [TomlInlineComment("Unicode emoji or emoji id")]

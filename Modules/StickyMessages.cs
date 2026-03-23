@@ -59,7 +59,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
 
         int prelength = stickyMessages.Count;
         stickyMessages = stickyMessages.DistinctBy(m => m.Id).ToList();
-        Logger.Put($"Removed {prelength - stickyMessages.Count} duplicates from stickymessages", LogType.Trace);
+        // Logger.Put($"Removed {prelength - stickyMessages.Count} duplicates from stickymessages", LogType.Trace);
             
         Lazy<List<DiscordMessage>> newMessages = new();
         Lazy<List<DiscordMessage>> deletedStickies = new();
@@ -84,8 +84,8 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
                 }
             }
             
-            Logger.Put(
-                $"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
+            // Logger.Put(
+            //     $"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
             DiscordMessage newMsg;
             try
             {
