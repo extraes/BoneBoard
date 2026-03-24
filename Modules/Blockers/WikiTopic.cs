@@ -29,13 +29,12 @@ internal partial class WikiTopic : ModuleBase
 {
     public WikiTopic(BoneBot bot) : base(bot)
     {
-        Config.ConfigChanged += () => { clint = null; wikiClint = null; topicStr = null; };
+        Config.ConfigChanged += () => { wikiClint = null; topicStr = null; };
     }
     const int HOURS_PER_TOPIC_CHANGE = 4;
     Dictionary<ulong, string> whyAUsersMessageWasDeleted = new();
     Dictionary<ulong, DiscordMessage> statusMessages = new();
     WikiClient? wikiClint;
-    OpenAIClient? clint;
     string? topicStr;
     CancellationTokenSource topicRollover = new();
 
@@ -136,7 +135,9 @@ internal partial class WikiTopic : ModuleBase
 
         string cleanContent = DSharpPlus.Formatter.Strip(content);
 
-        clint ??= new OpenAIClient(Config.values.openAiToken);
+        var clint = bot.OpenAI.Value;
+        if (clint is null)
+            return false;
 
         var chatClint = clint.GetChatClient(Config.values.wikiTopicModel);
         var messages = new ChatMessage[]

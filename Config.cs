@@ -96,6 +96,7 @@ internal class Config
     public string confessionCsvPath = "./confessions.csv";
     public string aiConfessionIsBotEmoji = "🤖";
     public string aiConfessionIsHumanEmoji = "👤";
+    public string openAiAltEndpoint = "";
     public string openAiToken = "";
     public string openAiSanityModel = "gpt-4o-mini";
     public string sanityAffirmative = "Yes";
