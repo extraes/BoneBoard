@@ -332,7 +332,24 @@ internal class FrogRole(BoneBot bot) : ModuleBase(bot)
                     int weeks = (int)span.TotalDays / 7;
                     string disName = memberson.DisplayName.Contains("mod.io") ? "fordkiller's apprentice" : Formatter.Sanitize(memberson.DisplayName);
                     disName = disName.Replace("://", " `y'all hear sum?` ").Replace("# ", "\\# ");
-                    string newLine = $"**{disName}** - {(weeks == 0 ? "" : weeks + "wk, ")}{(days == 0 ? "" : days + "d, ")}{span.Hours}h {span.Minutes}m{span.Seconds}s";
+
+                    string RandSpc() => Random.Shared.NextDouble() > 0.5 ? "" : " ";
+                    
+                    StringBuilder time = new();
+
+                    if (weeks > 0)
+                        time.Append($"{weeks}wk, {days}d, ");
+                    else if (days > 0)
+                        time.Append($"{days}d, ");
+
+                    time.Append(RandSpc());
+                    time.Append($"{span.Hours}h");
+                    time.Append(RandSpc());
+                    time.Append($"{span.Minutes}m");
+                    time.Append(RandSpc());
+                    time.Append($"{span.Seconds}s");
+                    
+                    string newLine = $"**{disName}** - {time}";
 
                     if (sb.Length + baseLen + newLine.Length + 1 < 2000)
                         sb.AppendLine(newLine);
