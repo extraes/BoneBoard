@@ -80,7 +80,10 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
                 }
                 catch
                 {
-                    // failure to fetch new content, that's fine, just resend the old content
+                    // failure to fetch new content, it was probably deleted
+                    TryDeleteDontCare(sticky);
+                    stickyMessages.Remove(sticky);
+                    continue;
                 }
             }
             

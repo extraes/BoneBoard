@@ -1,4 +1,5 @@
-﻿using BoneBoard.Modules;
+﻿using System.ClientModel;
+using BoneBoard.Modules;
 using BoneBoard.Modules.Blockers;
 using DSharpPlus;
 using DSharpPlus.Commands;
@@ -11,7 +12,9 @@ using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Azure.AI.OpenAI;
 using DSharpPlus.Commands.Trees;
+using OpenAI;
 
 namespace BoneBoard;
 
@@ -35,6 +38,18 @@ internal class BoneBot
     internal DiscordClient client;
     DiscordUser User => client.CurrentUser;
 
+    internal Configured<OpenAIClient?> OpenAI = new(() =>
+    {
+        if (string.IsNullOrWhiteSpace(Config.values.openAiToken))
+            return null;
+
+        if (string.IsNullOrWhiteSpace(Config.values.openAiAltEndpoint))
+            return new OpenAIClient(new ApiKeyCredential(Config.values.openAiToken));
+        else
+            return new AzureOpenAIClient(new Uri(Config.values.openAiAltEndpoint),
+                new ApiKeyCredential(Config.values.openAiToken));
+    }, () => Config.values.openAiToken + Config.values.openAiAltEndpoint);
+    
     internal Dictionary<DiscordGuild, HashSet<DiscordChannel>> allChannels = new();
 
     // activity agnostic

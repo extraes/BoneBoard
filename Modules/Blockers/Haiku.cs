@@ -21,12 +21,8 @@ namespace BoneBoard.Modules.Blockers;
 [Command("haiku")]
 internal class Haiku : ModuleBase
 {
-    public Haiku(BoneBot bot) : base(bot)
-    {
-        Config.ConfigChanged += () => openAiClient = null;
-    }
+    public Haiku(BoneBot bot) : base(bot) { }
     
-    OpenAIClient? openAiClient;
     static Dictionary<ulong, string> reasoningTraces = new Dictionary<ulong, string>();
 
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
@@ -99,13 +95,9 @@ internal class Haiku : ModuleBase
     async Task DetermineHaikuAsync(DiscordMessage msg, string content)
     {
         string[] lines = content.Split('\n');
+        var openAiClient = bot.OpenAI.Value;
         if (openAiClient is null)
-        {
-            if (string.IsNullOrEmpty(Config.values.openAiToken))
-                return;
-            else
-                openAiClient ??= new(new System.ClientModel.ApiKeyCredential(Config.values.openAiToken));
-        }
+            return;
         var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
         var clint = openAiClient.GetChatClient(Config.values.haikuAiModel);
         // determine effort first because 4o is a cheaper, non-reasoning model, lol

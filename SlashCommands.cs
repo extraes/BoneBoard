@@ -395,10 +395,11 @@ namespace BoneBoard
             string? filterFor = null,
             [Description("Only return logs that DON'T contain a specific string.")]
             string? filterOut = null,
-            bool reverse = true)
+            [Description("Reverses the order of log statements. Default=true.")]
+            bool newestFirst = true)
         {
             StringBuilder sb = new();
-            var collection = reverse ? Logger.LogStatements.Reverse() : Logger.LogStatements;
+            var collection = newestFirst ? Logger.LogStatements.Reverse() : Logger.LogStatements;
             foreach (var nextStr in collection)
             {
                 if (filterFor is not null && !nextStr.Contains(filterFor, StringComparison.InvariantCultureIgnoreCase))

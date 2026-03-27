@@ -51,13 +51,12 @@ internal class Confessional : ModuleBase
     // todo: propertyize
     Dictionary<DiscordMember, DateTime> confessions = new();
     List<DiscordMessage> confessionsByAi = new();
-    OpenAIClient? openAiClient;
     static TextWriter? csvConfessional;
     Task? occasionalConfessional;
 
     public Confessional(BoneBot bot) : base(bot)
     {
-        Config.ConfigChanged += () => { _confessionalChannel = null; openAiClient = null; };
+        Config.ConfigChanged += () => { _confessionalChannel = null; };
         bot.clientBuilder.ConfigureEventHandlers(x => x.HandleComponentInteractionCreated(DispatchInteractions));
 
         try
@@ -161,15 +160,9 @@ internal class Confessional : ModuleBase
         }
 
 
-
-
+        var openAiClient = bot.OpenAI.Value;
         if (openAiClient is null)
-        {
-            if (string.IsNullOrEmpty(Config.values.openAiToken))
-                return;
-            else
-                openAiClient ??= new(Config.values.openAiToken);
-        }
+            return;
 
         string mainModel = Config.values.openAiConfessionalModel;
         string mainSysPrompt = Config.values.openAiConfessionalSystemPrompt;
@@ -368,9 +361,6 @@ internal class Confessional : ModuleBase
 
     async void HandleConfessionVotingFor(DiscordMessage msg, DateTime revealAt)
     {
-        if (openAiClient is null)
-            return;
-
         DiscordEmoji? botEmoji, humanEmoji;
         try
         {
@@ -500,10 +490,9 @@ internal class Confessional : ModuleBase
             }
         }
 
-        if (Config.values.openAiToken is not null)
-            confessional.openAiClient ??= new(Config.values.openAiToken);
+        var openAiClient = confessional.bot.OpenAI.Value;
 
-        if (confessional.openAiClient is null)
+        if (openAiClient is null)
         {
             await ctx.FollowupAsync("AI rewriting is currently unavailable, so your confession can't be rewritten.", true);
             return;
@@ -515,7 +504,7 @@ internal class Confessional : ModuleBase
 
     private static async Task RewriteConfession(SlashCommandContext ctx, string confessionToRewrite, Confessional confessional)
     {
-        ChatClient clint = confessional.openAiClient!.GetChatClient(Config.values.openAiConfessionRewriteModel);
+        ChatClient clint = confessional.bot.OpenAI.Value!.GetChatClient(Config.values.openAiConfessionRewriteModel);
         BoneBot.Bots[ctx.Client].confessions.rewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, "I'm impatient and can't wait for an LLM to crunch its numbers!", DateTime.Now, DateTime.Now + TimeSpan.FromDays(1));
 
         string rewritten;
