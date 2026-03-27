@@ -398,7 +398,7 @@ namespace BoneBoard
             bool reverse = true)
         {
             StringBuilder sb = new();
-            var collection = reverse ? Logger.logStatements.Reverse() : Logger.logStatements;
+            var collection = reverse ? Logger.LogStatements.Reverse() : Logger.LogStatements;
             foreach (var nextStr in collection)
             {
                 if (filterFor is not null && !nextStr.Contains(filterFor, StringComparison.InvariantCultureIgnoreCase))

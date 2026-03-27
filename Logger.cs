@@ -8,12 +8,11 @@ namespace BoneBoard;
 
 internal static class Logger
 {
-    
-    const string PUT_DATE_FORMAT = "hh:mm:sstt"; // example: "12:33:05AM"
-    const string FILE_DATE_FORMAT = "yyyy-MM-dd h_m_stt"; // example: "2022-10-23 12_01_47AM"
-    readonly static int maxPutDateLength = PUT_DATE_FORMAT.Length;
-    internal static readonly CircularBuffer<string> logStatements = new(64);
-    static readonly StreamWriter logFile;
+    private const string PUT_DATE_FORMAT = "hh:mm:sstt"; // example: "12:33:05AM"
+    private const string FILE_DATE_FORMAT = "yyyy-MM-dd h_m_stt"; // example: "2022-10-23 12_01_47AM"
+    private static readonly int MaxPutDateLength = PUT_DATE_FORMAT.Length;
+    internal static readonly CircularBuffer<string> LogStatements = new(4096);
+    private static readonly StreamWriter LogFile;
 
     static Logger()
     {
@@ -23,7 +22,7 @@ internal static class Logger
         string latestPath = Path.Combine(Config.values.logPath, "latest.log");
 
         Console.WriteLine("Initializing logger");
-        logFile = File.AppendText(filePath);
+        LogFile = File.AppendText(filePath);
         
         if (File.Exists(latestPath))
             File.Delete(latestPath);
@@ -75,10 +74,10 @@ internal static class Logger
         Console.ResetColor();
         if (reason.writeToFile)
         {
-            logFile.WriteLine(fileString);
-            logFile.Flush();
+            LogFile.WriteLine(fileString);
+            LogFile.Flush();
         }
-        logStatements.PushBack(fileString);
+        LogStatements.PushBack(fileString);
     }
 
     public static string EnsureShorterThan(string str, int maxLen, string cutoffSignifier = "...")
@@ -88,7 +87,7 @@ internal static class Logger
         return str[..(maxLen - cutoffSignifier.Length)] + cutoffSignifier;
     }
 
-    static string GetPutTime() => DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(maxPutDateLength);
+    static string GetPutTime() => DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(MaxPutDateLength);
 
     static string GetCaller()
     {
