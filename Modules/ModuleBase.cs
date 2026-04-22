@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
 
-internal abstract partial class ModuleBase
+public abstract partial class ModuleBase
 {
 
     #region Statics

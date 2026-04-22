@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WikiClientLibrary.Client;
+// ReSharper disable All
 
 namespace BoneBoard.Modules.Blockers;
 

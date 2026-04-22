@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
-
 // done to avoid this reflection shit being in scope everywhere
 file static class ReflectionHelper
 {
@@ -17,25 +16,31 @@ file static class ReflectionHelper
     public static MethodInfo GetMethod(string name) => typeof(ModuleBase).GetMethod(name, EVENT_FLAGS) ?? throw new MissingMethodException(name);
 }
 
-internal abstract partial class ModuleBase
+public abstract partial class ModuleBase
 {
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
     // bot is set from the public ctor
     private ModuleBase()
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
     {
-        GuildDownloadCompletedEvent =   async (c, a) => { if (!DontPropagate.Contains(a)) await GuildDownloadCompleted(c, a);         };
-        MessageCreatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await MessageCreated(c, a);         };
-        MessageUpdatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await MessageUpdated(c, a);         };
-        ReactionAddedEvent =            async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionAdded(c, a);          };
-        ReactionRemovedEvent =          async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionRemoved(c, a);        };
-        GuildMemberUpdatedEvent =       async (c, a) => { if (!DontPropagate.Contains(a)) await GuildMemberUpdated(c, a);     };
-        ChannelCreatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await ChannelCreated(c, a);         };
-        ThreadCreatedEvent =            async (c, a) => { if (!DontPropagate.Contains(a)) await ThreadCreated(c, a);          };
-        SessionCreatedEvent =           async (c, a) => { if (!DontPropagate.Contains(a)) await SessionCreated(c, a);         };
-        UnknownEventEvent =             async (c, a) => { if (!DontPropagate.Contains(a)) await UnknownEvent(c, a);           };
+        GuildDownloadCompletedEvent =      async (c, a) => { if (!DontPropagate.Contains(a)) await GuildDownloadCompleted(c, a);         };
+        MessageCreatedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await MessageCreated(c, a);         };
+        MessageUpdatedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await MessageUpdated(c, a);         };
+        MessageDeletedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await MessageDeleted(c, a);         };
+        MessagesBulkDeletedEvent =         async (c, a) => { if (!DontPropagate.Contains(a)) await MessagesBulkDeleted(c, a);         };
+        ReactionAddedEvent =               async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionAdded(c, a);          };
+        ReactionRemovedEvent =             async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionRemoved(c, a);        };
+        GuildMemberUpdatedEvent =          async (c, a) => { if (!DontPropagate.Contains(a)) await GuildMemberUpdated(c, a);     };
+        ChannelCreatedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await ChannelCreated(c, a);         };
+        ThreadCreatedEvent =               async (c, a) => { if (!DontPropagate.Contains(a)) await ThreadCreated(c, a);          };
+        SessionCreatedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await SessionCreated(c, a);         };
+        GuildAuditLogCreatedEvent =        async (c, a) => { if (!DontPropagate.Contains(a)) await GuildAuditLogCreated(c, a);         };
+        InteractionCreatedEvent =          async (c, a) => { if (!DontPropagate.Contains(a)) await InteractionCreated(c, a);         };
+        ComponentInteractionCreatedEvent = async (c, a) => { if (!DontPropagate.Contains(a)) await ComponentInteractionCreated(c, a);         };
+        ModalSubmittedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await ModalSubmitted(c, a);         };
+        UnknownEventEvent =                async (c, a) => { if (!DontPropagate.Contains(a)) await UnknownEvent(c, a);           };
     }
-
+    
     static readonly MethodInfo BaseGuildDownloadCompleted = ReflectionHelper.GetMethod(nameof(GuildDownloadCompleted));
     private Func<DiscordClient, GuildDownloadCompletedEventArgs, Task> GuildDownloadCompletedEvent;
     protected virtual Task GuildDownloadCompleted(DiscordClient client, GuildDownloadCompletedEventArgs args) => Task.CompletedTask;
@@ -47,6 +52,14 @@ internal abstract partial class ModuleBase
     static readonly MethodInfo BaseMessageUpdated = ReflectionHelper.GetMethod(nameof(MessageUpdated));
     private Func<DiscordClient, MessageUpdatedEventArgs, Task> MessageUpdatedEvent;
     protected virtual Task MessageUpdated(DiscordClient client, MessageUpdatedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseMessageDeleted = ReflectionHelper.GetMethod(nameof(MessageDeleted));
+    private Func<DiscordClient, MessageDeletedEventArgs, Task> MessageDeletedEvent;
+    protected virtual Task MessageDeleted(DiscordClient client, MessageDeletedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseMessagesBulkDeleted = ReflectionHelper.GetMethod(nameof(MessagesBulkDeleted));
+    private Func<DiscordClient, MessagesBulkDeletedEventArgs, Task> MessagesBulkDeletedEvent;
+    protected virtual Task MessagesBulkDeleted(DiscordClient client, MessagesBulkDeletedEventArgs args) => Task.CompletedTask;
     
     static readonly MethodInfo BaseReactionAdded = ReflectionHelper.GetMethod(nameof(ReactionAdded));
     private Func<DiscordClient, MessageReactionAddedEventArgs, Task> ReactionAddedEvent;
@@ -71,6 +84,22 @@ internal abstract partial class ModuleBase
     static readonly MethodInfo BaseSessionCreated = ReflectionHelper.GetMethod(nameof(SessionCreated));
     private Func<DiscordClient, SessionCreatedEventArgs, Task> SessionCreatedEvent;
     protected virtual Task SessionCreated(DiscordClient client, SessionCreatedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseGuildAuditLogCreated = ReflectionHelper.GetMethod(nameof(GuildAuditLogCreated));
+    private Func<DiscordClient, GuildAuditLogCreatedEventArgs, Task> GuildAuditLogCreatedEvent;
+    protected virtual Task GuildAuditLogCreated(DiscordClient client, GuildAuditLogCreatedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseInteractionCreated = ReflectionHelper.GetMethod(nameof(InteractionCreated));
+    private Func<DiscordClient, InteractionCreatedEventArgs, Task> InteractionCreatedEvent;
+    protected virtual Task InteractionCreated(DiscordClient client, InteractionCreatedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseComponentInteractionCreated = ReflectionHelper.GetMethod(nameof(ComponentInteractionCreated));
+    private Func<DiscordClient, ComponentInteractionCreatedEventArgs, Task> ComponentInteractionCreatedEvent;
+    protected virtual Task ComponentInteractionCreated(DiscordClient client, ComponentInteractionCreatedEventArgs args) => Task.CompletedTask;
+    
+    static readonly MethodInfo BaseModalSubmitted = ReflectionHelper.GetMethod(nameof(ModalSubmitted));
+    private Func<DiscordClient, ModalSubmittedEventArgs, Task> ModalSubmittedEvent;
+    protected virtual Task ModalSubmitted(DiscordClient client, ModalSubmittedEventArgs args) => Task.CompletedTask;
 
     static readonly MethodInfo BaseUnknownEvent = ReflectionHelper.GetMethod(nameof(UnknownEvent));
     private Func<DiscordClient, UnknownEventArgs, Task> UnknownEventEvent;

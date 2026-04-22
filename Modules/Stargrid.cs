@@ -351,11 +351,8 @@ internal class Stargrid : ModuleBase
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
+    public async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
     {
-        if (await SlashCommands.ModGuard(ctx, false))
-            return;
-
         if (ctx.Member is null || !ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
         {
             await ctx.RespondAsync("nuh uh", true);
@@ -374,7 +371,7 @@ internal class Stargrid : ModuleBase
             Logger.Put("Caught exception when refetching message: " + e.Message);
         }
 
-        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, null);
+        await PerformQuote(msg, null);
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }
 
@@ -382,11 +379,8 @@ internal class Stargrid : ModuleBase
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
+    public async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
     {
-        if (await SlashCommands.ModGuard(ctx, false))
-            return;
-
         if (ctx.Member is null)
         {
             await ctx.RespondAsync("😂👎", true);
@@ -401,8 +395,7 @@ internal class Stargrid : ModuleBase
 
         await ctx.DeferResponseAsync(true);
         Logger.Put($"Quote forced from {ctx.Member} on message {msg}");
-
-
+        
         try
         {
             msg = await msg.Channel!.GetMessageAsync(msg.Id);
@@ -421,7 +414,7 @@ internal class Stargrid : ModuleBase
             return;
         }
 
-        await BoneBot.Bots[ctx.Client].stargrid.PerformQuote(msg, emoji);
+        await PerformQuote(msg, emoji);
 
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }

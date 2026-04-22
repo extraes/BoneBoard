@@ -20,6 +20,8 @@ internal class Program
             {
                 Logger.Put("HI PLEASE PUT IN A TOKEN IN THE NEWLY GENERATED CONFIG FILE THX!!! :)");
             }
+            
+            Environment.Exit(1);
         }
         
         Logger.Put("Initializing bot...");

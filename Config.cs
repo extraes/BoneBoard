@@ -70,7 +70,6 @@ internal class Config
 
     public ulong[] casinoRoleIds = [];
 
-    public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromMedia = new() { { "1", [2, 3] } };
     [TomlPrecedingComment("includes stickers & rxns")]
     public Dictionary<string, ulong[]> channelsWhereUsersAreProhibitedFromCustomEmojis = new() { { "1", [2, 3] } };
     public Dictionary<string, string[]> channelsWhereAllFlagsButListedAreProhibited = new() { { "1", ["2", "3"] } };

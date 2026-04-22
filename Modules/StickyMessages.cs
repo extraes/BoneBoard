@@ -3,6 +3,7 @@ using System.ComponentModel;
 using ConcurrentCollections;
 using DSharpPlus;
 using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
@@ -122,13 +123,11 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     }
 
     [Command("create"), Description("Creates a new sticky message in this channel.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task CreateStickyMessage(
         SlashCommandContext ctx,
         [Description("\\n will be replaced with a newline.")] string content)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         content = content.Replace("\\n", "\n");
         try
         {
@@ -148,11 +147,9 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     }
     
     [Command("clear"), Description("Stops any stickied messages in this channel from being re-stickied in the future.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task ClearStickyMessages(SlashCommandContext ctx)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         List<DiscordMessage> removeMessages = new();
         foreach (var msg in stickyMessages)
         {
@@ -171,11 +168,9 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     }
     
     [Command("remove"), Description("Stops a specific stickied message from being re-stickied in the future.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         DiscordMessage? msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
         if (msg is null)
         {
@@ -191,11 +186,9 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     
     
     [Command("edit"), Description("Edits a stickied message")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-        
         DiscordMessage? msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
         if (msg is null)
         {

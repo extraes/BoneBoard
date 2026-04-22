@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BoneBoard.Modules;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BoneBoard;
 
@@ -51,5 +53,16 @@ public static class Extensions
         }
         // return result
         return matrix[strLength, otherLength];
+    }
+
+    public static TModule GetModule<TModule>(this IServiceProvider services) where TModule : ModuleBase
+    {
+        var module = services.GetService(typeof(TModule));
+        
+        if (module is null)
+            throw new InvalidOperationException(
+                $"The module type {typeof(TModule).FullName} wasn't injected into services! Review startup code!");
+        
+        return (TModule)module;
     }
 }

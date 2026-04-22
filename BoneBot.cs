@@ -1,4 +1,5 @@
 ﻿using System.ClientModel;
+using System.Diagnostics.CodeAnalysis;
 using BoneBoard.Modules;
 using BoneBoard.Modules.Blockers;
 using DSharpPlus;
@@ -13,28 +14,23 @@ using SixLabors.ImageSharp;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Azure.AI.OpenAI;
+using DSharpPlus.Commands.Exceptions;
 using DSharpPlus.Commands.Trees;
 using OpenAI;
 
 namespace BoneBoard;
 
-internal class BoneBot
+public class BoneBot
 {
 
     public static Dictionary<DiscordClient, BoneBot> Bots { get; } = new();
 
-    internal ModuleBase[] blockers;
-    internal Casino casino;
-    internal Hangman hangman;
-    internal FrogRole frogRole;
-    internal Confessional confessions;
-    internal Stargrid stargrid;
-    internal MessageBuffer msgBuffer;
-    internal ImageRoyale imageRoyale;
-    internal VideoRoyale videoRoyale;
-    internal StickyMessages stickyMessages;
+    internal IServiceProvider ServiceProvider;
     
-    internal DiscordClientBuilder clientBuilder;
+    /// <summary>
+    /// Will be null after client creation to avoid silent failures.
+    /// </summary>
+    internal DiscordClientBuilder? clientBuilder;
     internal DiscordClient client;
     DiscordUser User => client.CurrentUser;
 
@@ -70,102 +66,39 @@ internal class BoneBot
 
     public BoneBot(string token)
     {
-        //Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.addconsole)
         clientBuilder = DiscordClientBuilder.CreateDefault(token, DiscordIntents.GuildMessages | DiscordIntents.MessageContents | DiscordIntents.GuildMessageReactions | DiscordIntents.DirectMessageReactions | DiscordIntents.Guilds | DiscordIntents.GuildMembers);
         clientBuilder.ConfigureEventHandlers(e =>
         {
             e.HandleGuildDownloadCompleted(GetGuildResources)
                 .HandleSessionCreated(Ready)
-                .HandleMessageCreated(MessageCreated)
-                .HandleMessageUpdated(MessageUpdated)
                 .HandleChannelCreated(ChannelCreated)
                 .HandleThreadCreated(ThreadCreated)
                 .HandleUnknownEvent((c, a) => Task.CompletedTask);
         });
         
         RelaunchParameters.SetupProcessStartMessage(Environment.GetCommandLineArgs(), clientBuilder);
-        //clientBuilder.SetLogLevel(LogLevel.Trace);
-        //clientBuilder.ConfigureGatewayClient(c => c.GatewayCompressionLevel = GatewayCompressionLevel.None);
-        clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Warning)));
-        blockers =
-        [
-            new ModeratorIgnore(this),
-            new PerChannelTimeout(this),
-            new Reslow(this),
-            new CustomEmojisAndStickers(this),
-            new FlagRestriction(this),
-            new MustStartWith(this),
-            new WordPercentage(this),
-            new NoVowels(this),
-            new SheOnMyTill(this),
-            new Haiku(this),
-            new WikiTopic(this),
-        ];
-        casino = new(this);
-        hangman = new(this);
-        frogRole = new(this);
-        confessions = new(this);
-        stargrid = new(this);
-        msgBuffer = new(this);
-        imageRoyale = new(this);
-        videoRoyale = new(this);
-        stickyMessages = new(this);
-        // clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(StickyMessages), stickyMessages));
         
-        clientBuilder.ConfigureServices(x => x.AddSingleton(typeof(BoneBot), this));
+        clientBuilder.ConfigureServices(x => x.AddLogging(y => y.AddConsole(clo => clo.LogToStandardErrorThreshold = LogLevel.Warning)));
+        CreateModules();
+        
+        clientBuilder.ConfigureServices(x => x.AddSingleton(this));
         SlashCommandProcessor scp = new();
         MessageCommandProcessor mcp = new();
-
         
-        
-        Type[] commandTypes = new[] { typeof(SlashCommands) }
+        var commandTypes = new[] { typeof(SlashCommands) }
             .Concat(ModuleBase.AllModules.Select(m => m.GetType())
             .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null))
             .ToArray();
-
-        // doesnt matter anyway lol D#+ creates a new instance for every invocation, even on static commands
-        // for (int i = commandTypes.Length - 1; i >= 0; i--)
-        // {
-        //     Type type =  commandTypes[i];
-        //     var instanceCommands = type.GetMethods().Where(m => !m.IsStatic && m.GetCustomAttribute<CommandAttribute>() != null);
-        //     foreach (var cmd in instanceCommands)
-        //     {
-        //         Logger.Warn($"DICKHEAD!!!! DONT MAKE INSTANCED COMMANDS!!!!! Offender: {type.FullName ?? "<Anonymous type>"}.{cmd.Name}");
-        //     }
-        // }
         
-        // IEnumerable<CommandBuilder> commandBuilders = new[] { typeof(SlashCommands) }
-        //     .Concat(ModuleBase.AllModules.Select(m => m.GetType())
-        //         .Where(t => t.GetCustomAttribute<CommandAttribute>() is not null))
-        //     .Select(CommandBuilder.From);
-        //
-        // clientBuilder.ConfigureEventHandlers(x =>
-        //     /* Discord's docs state:
-        //      * "When connecting to the gateway as a bot user, guilds that the bot is a part of will start out as
-        //      * unavailable. [...] As guilds become available to you, you will receive Guild Create events."
-        //      */
-        //     x.HandleGuildCreated(async (client, args) =>
-        //     {
-        //         foreach (var command in commandBuilders.SelectMany(cb => cb.Flatten()).Select(cb => cb.Build()))
-        //         {
-        //             args.Guild.CreateApplicationCommandAsync(command);
-        //                 
-        //         }
-        //         args.Guild.BulkOverwriteApplicationCommandsAsync()
-        //     })
-        // );
-        //
-        // DSharpPlus.Commands.Trees.CommandBuilder.From()
         clientBuilder.UseCommands((isp, ce) =>
         {
             ce.AddProcessors(scp, mcp);
             ce.AddCommands(commandTypes);
             ce.CommandErrored += CommandErrorHandler;
-        }, new()
+        }, new CommandsConfiguration
         {
             RegisterDefaultCommandProcessors = false,
             UseDefaultCommandErrorHandler = false, // annoying fuck
-            
         });
 
         foreach (var module in ModuleBase.AllModules)
@@ -174,23 +107,55 @@ internal class BoneBot
         }
         
         client = clientBuilder.Build();
+        clientBuilder = null;
+        ServiceProvider = client.ServiceProvider;
 
         Bots.Add(client, this);
     }
 
-    private Task ThreadCreated(DiscordClient client, ThreadCreatedEventArgs args)
+#pragma warning disable CA1806
+    [SuppressMessage("ReSharper", "ObjectCreationAsStatement")]
+    private void CreateModules()
+    {
+        // Blockers 
+        new ModeratorIgnore(this);
+        new PerChannelTimeout(this);
+        new Reslow(this);
+        new CustomEmojisAndStickers(this);
+        new FlagRestriction(this);
+        new MustStartWith(this);
+        new WordPercentage(this);
+        new NoVowels(this);
+        new SheOnMyTill(this);
+        new Haiku(this);
+        new WikiTopic(this);
+                
+        // Non-blockers
+        new Casino(this);
+        new Hangman(this);
+        new FrogRole(this);
+        new Confessional(this);
+        new Stargrid(this);
+        new MessageBuffer(this);
+        new ImageRoyale(this);
+        new VideoRoyale(this);
+        new StickyMessages(this);
+    }
+#pragma warning restore CA1806
+
+    private Task ThreadCreated(DiscordClient clint, ThreadCreatedEventArgs args)
     {
         if (!allChannels.TryGetValue(args.Guild, out var allChannelsSlice))
-            allChannelsSlice = allChannels[args.Guild] = new();
+            allChannelsSlice = allChannels[args.Guild] = new HashSet<DiscordChannel>();
 
         allChannelsSlice.Add(args.Thread);
         return Task.CompletedTask;
     }
 
-    private Task ChannelCreated(DiscordClient client, ChannelCreatedEventArgs args)
+    private Task ChannelCreated(DiscordClient clint, ChannelCreatedEventArgs args)
     {
         if (!allChannels.TryGetValue(args.Guild, out var allChannelsSlice))
-            allChannelsSlice = allChannels[args.Guild] = new();
+            allChannelsSlice = allChannels[args.Guild] = new HashSet<DiscordChannel>();
 
         allChannelsSlice.Add(args.Channel);
         return Task.CompletedTask;
@@ -198,59 +163,69 @@ internal class BoneBot
 
     private async Task CommandErrorHandler(CommandsExtension sender, DSharpPlus.Commands.EventArgs.CommandErroredEventArgs args)
     {
-        int randomNumber = Random.Shared.Next();
-        Logger.Error($" [{randomNumber}] Exception while executing command on command object {args.CommandObject}", args.Exception);
-        string userResponse = $"Exception while running your command! Tell the host/developer to look for {randomNumber} in the log!```\n{Logger.EnsureShorterThan(args.Exception.ToString(), 1750, "\n[cut off for Discord]")}```";
-
+        string userResponse;
+        
+        // if (args.Exception is AggregateException agEx && agEx.InnerExceptions.Count == 1 &&  agEx.InnerExceptions[0] is )
+        if (args.Exception is ChecksFailedException checkEx)
+        {
+            var errorStrings = checkEx.Errors.Select(d => d.ErrorMessage).Distinct();
+            userResponse = $"One or more checks failed:\n{string.Join("\n", errorStrings)}";
+        }
+        else
+        {
+            int randomNumber = Random.Shared.Next();
+            Logger.Error($" [{randomNumber}] Exception while executing command on command object {args.CommandObject}", args.Exception);
+            userResponse = $"Exception while running your command! Tell the host/developer to look for {randomNumber} in the log! (Exception type: {args.Exception.GetType().FullName})" +
+                           $"```\n{Logger.EnsureShorterThan(args.Exception.ToString(), 1750, "\n[cut off for Discord]")}```";
+        }
 
         if (args.Context is SlashCommandContext sctx)
         {
             switch (sctx.Interaction.ResponseState)
             {
                 case DiscordInteractionResponseState.Unacknowledged:
-                    {
-                        await sctx.Interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().AsEphemeral().WithContent(userResponse));
-                    }
+                {
+                    await sctx.Interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().AsEphemeral().WithContent(userResponse));
+                }
                     break;
                 case DiscordInteractionResponseState.Replied:
-                    {
-                        await sctx.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(userResponse));
-                    }
+                {
+                    await sctx.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(userResponse));
+                }
                     break;
                 case DiscordInteractionResponseState.Deferred:
-                    {
-                        await sctx.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(userResponse));
-                    }
+                {
+                    await sctx.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(userResponse));
+                }
                     break;
             }
         }
         else
             await args.Context.RespondAsync(userResponse);
-
     }
 
     public void ConfigureEvents(Action<EventHandlingBuilder> action)
     {
-        if (client is not null)
+        if (clientBuilder is null)
             return;
         //throw new InvalidOperationException("Cannot add events after client is built!");
 
         clientBuilder.ConfigureEventHandlers(action);
     }
 
+    // Don't care about async void warnings. This gets called during init, so if it fails the entire program goes down.
+    // ReSharper disable once AsyncVoidMethod
     public async void Init()
     {
-        //todo re-add commands
-
         await client.ConnectAsync();
     }
 
-    private async Task GetGuildResources(DiscordClient client, GuildDownloadCompletedEventArgs args)
+    private async Task GetGuildResources(DiscordClient clint, GuildDownloadCompletedEventArgs args)
     {
         foreach (var channelKvp in args.Guilds.Values.SelectMany(dg => dg.Channels))
         {
             if (!allChannels.TryGetValue(channelKvp.Value.Guild, out var allChannelsSlice))
-                allChannelsSlice = allChannels[channelKvp.Value.Guild] = new();
+                allChannelsSlice = allChannels[channelKvp.Value.Guild] = new HashSet<DiscordChannel>();
 
             allChannelsSlice.Add(channelKvp.Value);
             if (channelKvp.Value.Type is DiscordChannelType.Text or DiscordChannelType.GuildForum or DiscordChannelType.GuildMedia or DiscordChannelType.News)
@@ -279,54 +254,11 @@ internal class BoneBot
         calledAllChannelsReceived = true;
     }
 
-    async Task Ready(DiscordClient client, SessionCreatedEventArgs args)
+    Task Ready(DiscordClient clint, SessionCreatedEventArgs args)
     {
         Logger.Put($"Logged in on user {User.Username}#{User.Discriminator} (ID {User.Id})");
+        return Task.CompletedTask;
     }
-
-    #region Message
-
-    private async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
-    {
-        if (args.Message.Author is null || Config.values.blockedUsers.Contains(args.Message.Author.Id))
-            return;
-        DiscordMember? member = args.Author as DiscordMember;
-        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermission.ManageMessages);
-
-        if (Config.values.channelsWhereUsersAreProhibitedFromMedia.TryGetValue(args.Channel.Id.ToString(), out ulong[]? mediaUserIds) && mediaUserIds.Contains(args.Author.Id))
-        {
-            if (args.Message.Attachments.Count > 0 || args.Message.Embeds.Count > 0)
-            {
-                try
-                {
-                    await args.Message.DeleteAsync("this user gets no media in this channel. woe.");
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Failed to delete message with media from {member}! ", ex);
-                }
-            }
-        }
-        
-
-        
-    }
-
-    private async Task MessageUpdated(DiscordClient sender, MessageUpdatedEventArgs args)
-    {
-        if (args.Author?.IsBot ?? true)
-            return;
-        DiscordMember? member = args.Author as DiscordMember;
-        bool hasManageMessages = member is not null && member.Permissions.HasPermission(DiscordPermission.ManageMessages);
-
-        if (!hasManageMessages && Config.values.channelsWhereNoVowelsAreAllowed.Contains(args.Channel.Id) && args.Message.Content.Any(c => "aeiou".Contains(c, StringComparison.InvariantCultureIgnoreCase)))
-        {
-            await args.Message.DeleteAsync("has vowels. cnat edit to do that., u tried'");
-        }
-    }
-
-    #endregion
 
     internal bool IsMe(DiscordUser? user) => user is not null && user == User;
 

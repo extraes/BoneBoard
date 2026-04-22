@@ -1,18 +1,19 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.ComponentModel;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
 
 namespace BoneBoard.Modules;
 
+[Command("msgbuffer")]
 internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
 {
     const long DEFAULT_FILE_SIZE_LIMIT = 10 * 1000 * 1000; // 10MB
+
     static readonly Dictionary<DiscordPremiumTier, long> FileSizeLimits = new()
     {
         { DiscordPremiumTier.None, DEFAULT_FILE_SIZE_LIMIT },
@@ -48,7 +49,8 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
             return false;
 
         bool isBufferExempt = member.Roles.Any(r => Config.values.bufferExemptRoles.Contains(r.Id));
-        if (PersistentData.values.bufferedChannels.Contains(message.ChannelId) && !isBufferExempt && !bot.IsMe(message.Author))
+        if (PersistentData.values.bufferedChannels.Contains(message.ChannelId) && !isBufferExempt &&
+            !bot.IsMe(message.Author))
         {
             return true;
         }
@@ -73,9 +75,11 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
             {
                 if (attachment.FileSize > fileSizeLimit)
                 {
-                    Logger.Put($"Attachment {attachment.FileName} on message {msg.JumpLink} is too big to buffer! ({Math.Round(attachment.FileSize / 1024.0 / 1024.0, 2)}MB > {Math.Round(fileSizeLimit / 1024.0 / 1024.0, 2)}MB)");
+                    Logger.Put(
+                        $"Attachment {attachment.FileName} on message {msg.JumpLink} is too big to buffer! ({Math.Round(attachment.FileSize / 1024.0 / 1024.0, 2)}MB > {Math.Round(fileSizeLimit / 1024.0 / 1024.0, 2)}MB)");
                     continue;
                 }
+
                 if (string.IsNullOrEmpty(attachment.Url))
                 {
                     Logger.Error("Attachment on message " + msg.JumpLink + " has no URL!");
@@ -123,18 +127,29 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
                     Logger.Put($"Sending buffered message from {recreateMessage.Author}");
                     DiscordMessage? reference = recreateMessage.ReferencedMessage;
 
-                    if (reference is not null && recreatedContentToReferences.TryGetValue(reference.Content, out DiscordMessage? refMsg))
+                    if (reference is not null &&
+                        recreatedContentToReferences.TryGetValue(reference.Content, out DiscordMessage? refMsg))
                         reference = refMsg;
 
 
-                    string author = recreateMessage.Author is DiscordMember member ? Formatter.Strip(member.DisplayName).Replace("://", "\\://") : recreateMessage.Author?.Username ?? "uhh i forgor";
-                    string replyingToAuthor = reference?.Author is DiscordMember replyMember ? Formatter.Strip(replyMember.DisplayName).Replace("https:", "https\\:") : reference?.Author?.Username ?? "NOBODY LOL";
-                    string replyingToContent = reference is not null ? Logger.EnsureShorterThan(reference.Content, 200, "(yap)").Replace("\n", "") : "";
-                    string content = Logger.EnsureShorterThan(recreateMessage.Content, 2000 - replyingToAuthor.Length - replyingToContent.Length - author.Length - 50, "(Truncated due to excessive yapping)");
+                    string author = recreateMessage.Author is DiscordMember member
+                        ? Formatter.Strip(member.DisplayName).Replace("://", "\\://")
+                        : recreateMessage.Author?.Username ?? "uhh i forgor";
+                    string replyingToAuthor = reference?.Author is DiscordMember replyMember
+                        ? Formatter.Strip(replyMember.DisplayName).Replace("https:", "https\\:")
+                        : reference?.Author?.Username ?? "NOBODY LOL";
+                    string replyingToContent = reference is not null
+                        ? Logger.EnsureShorterThan(reference.Content, 200, "(yap)").Replace("\n", "")
+                        : "";
+                    string content = Logger.EnsureShorterThan(recreateMessage.Content,
+                        2000 - replyingToAuthor.Length - replyingToContent.Length - author.Length - 50,
+                        "(Truncated due to excessive yapping)");
 
-                    string finalContent = (reference is not null ? $"Replying to **{replyingToAuthor}**: '{replyingToContent}'\n" : "")
-                        + (!string.IsNullOrWhiteSpace(content) ? $"\"{content}\"\n" : "")
-                        + $"\\- {author}";
+                    string finalContent = (reference is not null
+                                              ? $"Replying to **{replyingToAuthor}**: '{replyingToContent}'\n"
+                                              : "")
+                                          + (!string.IsNullOrWhiteSpace(content) ? $"\"{content}\"\n" : "")
+                                          + $"\\- {author}";
 
                     recreatedContentToReferences[finalContent] = recreateMessage;
 
@@ -145,7 +160,8 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
                     foreach (DiscordAttachment attachment in recreateMessage.Attachments)
                     {
                         // todo: make uploads go to extraes.xyz when too big (requires skating around cloudflare's 100mb limit on free accts. try/add chunking!)
-                        if (attachment.FileSize > DEFAULT_FILE_SIZE_LIMIT || attachment.Url is null || attachment.FileName is null)
+                        if (attachment.FileSize > DEFAULT_FILE_SIZE_LIMIT || attachment.Url is null ||
+                            attachment.FileName is null)
                             continue;
 
                         if (!cachedQueuedAttachmentPaths.TryGetValue(attachment.Url, out string? path))
@@ -164,9 +180,9 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
                         string fileName = attachment.FileName;
                         while (builder.Files.Any(f => f.FileName == fileName))
                         {
-
                             fileName = Random.Shared.Next(10) + "_" + fileName;
                         }
+
                         builder.AddFile(fileName, fs);
                         openedFiles.Add(fs);
                     }
@@ -180,6 +196,7 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
                         fs.Close();
                         File.Delete(fs.Name); // 👍
                     }
+
                     openedFiles.Clear();
                 }
             }
@@ -196,9 +213,12 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
                     Logger.Error($"Buffered channel {channel.Name} doesn't have a saved notification message ID!");
                     continue;
                 }
-                if (!PersistentData.values.bufferChannelMessageFormats.TryGetValue(channel.Id, out string? bufferFormat))
+
+                if (!PersistentData.values.bufferChannelMessageFormats.TryGetValue(channel.Id,
+                        out string? bufferFormat))
                 {
-                    Logger.Error($"Buffered channel {channel.Name} doesn't have a saved notification message format str!");
+                    Logger.Error(
+                        $"Buffered channel {channel.Name} doesn't have a saved notification message format str!");
                     continue;
                 }
 
@@ -230,5 +250,105 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
 
         TimeSpan waitTime = TimeSpan.FromMinutes(Config.values.bufferTimeMinutes);
         dumpMessagesTimer = new(_ => _ = SendBufferedMessages(), null, waitTime, waitTime);
+    }
+
+
+    [Command("setBufferedChannel")]
+    [Description("Toggle whether this channel is un/buffered")]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public static async Task SetBufferedChannel(
+        SlashCommandContext ctx,
+        [Parameter("add")] [Description("True to add, false to remove.")]
+        bool add,
+        [Parameter("bufferMessageText")] [Description("{0} will be replaced by timestamp.")]
+        string bufferMessage = ""
+    )
+    {
+        var channelId = ctx.Channel.Id;
+
+        if (add)
+        {
+            if (PersistentData.values.bufferedChannels.Contains(channelId))
+            {
+                await ctx.RespondAsync("This channel is already buffered.", true);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(bufferMessage))
+            {
+                await ctx.RespondAsync(
+                    "You know... if you want to make a channel buffered, it's best if the people know that it's buffered.",
+                    true);
+                return;
+            }
+
+            var timestamp = "(a yet unknown time)";
+            PersistentData.values.bufferedChannels.Add(channelId);
+            var msg = await ctx.Channel.SendMessageAsync(string.Format(bufferMessage, timestamp));
+            PersistentData.values.bufferChannelMessages[channelId] = msg.Id;
+            PersistentData.values.bufferChannelMessageFormats[channelId] = bufferMessage;
+
+            await ctx.RespondAsync("Added channel to buffer list.", true);
+        }
+        else
+        {
+            if (!PersistentData.values.bufferedChannels.Contains(channelId))
+            {
+                await ctx.RespondAsync("This channel isn't buffered.", true);
+                return;
+            }
+
+            PersistentData.values.bufferedChannels.Remove(channelId);
+            PersistentData.values.bufferChannelMessages.Remove(channelId);
+            await ctx.RespondAsync("Removed channel from buffer list.", true);
+        }
+
+        PersistentData.WritePersistentData();
+    }
+
+    [Command("startUnbufferTimer")]
+    [Description("Starts the timer to un-buffer messages sent during buffer-time")]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public async Task StartUnbufferTimer(SlashCommandContext ctx)
+    {
+        StartUnbufferTimer();
+        var timestamp = Formatter.Timestamp(DateTime.Now.AddMinutes(Config.values.bufferTimeMinutes),
+            TimestampFormat.ShortTime);
+
+        StringBuilder sb = new($"Started unbuffer timer. Check back @ {timestamp}\n");
+
+        foreach (var bufferedChannelId in PersistentData.values.bufferedChannels)
+        {
+            try
+            {
+                var channel = await ctx.Client.GetChannelAsync(bufferedChannelId);
+                var msg = await channel.GetMessageAsync(PersistentData.values.bufferChannelMessages[bufferedChannelId]);
+                await msg.ModifyAsync(
+                    string.Format(PersistentData.values.bufferChannelMessageFormats[bufferedChannelId], timestamp));
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"!!! Error editing channel's buffer notif msg (ID {bufferedChannelId}): {ex.Message}");
+            }
+        }
+
+        await ctx.RespondAsync(sb.ToString(), true);
+    }
+
+
+    [Command("flushBufferedMessages")]
+    [Description("Immediately flushes buffered messages. Doesn't stop the timer.")]
+    [RequireGuild]
+    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    public async Task FlushBufferedMessages(SlashCommandContext ctx)
+    {
+        await ctx.DeferResponseAsync(true);
+
+        await SendBufferedMessages();
+
+        var builder = new DiscordFollowupMessageBuilder().WithContent("Flushed buffered messages in all servers 👍.");
+        await ctx.FollowupAsync(builder);
     }
 }

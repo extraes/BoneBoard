@@ -216,8 +216,9 @@ internal partial class Casino : ModuleBase
     [Command("checkPoints"), Description("Check your points!")]
     public static async Task CheckCasinoPoints(SlashCommandContext ctx,
         [Parameter("sendSecretly"), Description("Whether to show to only you.")] bool ephemeral = true)
-    {
-        await BoneBot.Bots[ctx.Client].casino.CheckPoints(ctx, ephemeral);
+    { 
+        var casino = (Casino)BoneBot.Bots[ctx.Client].ServiceProvider.GetService(typeof(Casino))!;
+        await casino.CheckPoints(ctx, ephemeral);
     }
 
     [Command("slots"), Description("GAMBLING GAMBLING GAMBLING")]
@@ -225,20 +226,19 @@ internal partial class Casino : ModuleBase
         [Parameter("amount"), Description("How many points to gamble.")] int amount,
         [Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
     {
-        await BoneBot.Bots[ctx.Client].casino.GambleSlots(ctx, amount, ephemeral);
+        var casino = (Casino)BoneBot.Bots[ctx.Client].ServiceProvider.GetService(typeof(Casino))!;
+        await casino.GambleSlots(ctx, amount, ephemeral);
     }
 
     [Command("givePoints"), Description("Give a user points")]
     [RequireGuild]
-    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+    [RequireApplicationOwner]
     public static async Task GivePoints(SlashCommandContext ctx,
         [Parameter("amount"), Description("How many points to give.")] int amount,
         [Parameter("sendTo"), Description("Who to give points to.")] DiscordMember user)
     {
-        if (await SlashCommands.ModGuard(ctx, true))
-            return;
-
-        BoneBot.Bots[ctx.Client].casino.GivePoints(user, amount);
+        var casino = (Casino)BoneBot.Bots[ctx.Client].ServiceProvider.GetService(typeof(Casino))!;
+        casino.GivePoints(user, amount);
 
         try
         {

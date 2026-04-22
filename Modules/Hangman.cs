@@ -100,7 +100,7 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
                 await BoneBot.TryReact(args.Message, checkEmojis.Random());
                 int pointsGiven = VOWELS.Contains(char.ToLower(content[0])) ? 100 : 200;
                 if (args.Author is DiscordMember member)
-                    bot.casino.GivePoints(member, pointsGiven);
+                    bot.ServiceProvider.GetModule<Casino>().GivePoints(member, pointsGiven);
                 await UpdateHangmanDisplay();
             }
             else if (char.IsLetter(content[0]))
@@ -118,7 +118,7 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
             PersistentData.values.currHangmanGuessed = new string(PersistentData.values.currHangmanWord.Distinct().ToArray());
             //PersistentData.WritePersistentData(); GivePoints calls WritePersistentData
             if (args.Author is DiscordMember member)
-                bot.casino.GivePoints(member, 500);
+                bot.ServiceProvider.GetModule<Casino>().GivePoints(member, 500);
 
             await BoneBot.TryReact(args.Message, checkEmojis.Random());
             await UpdateHangmanDisplay();
@@ -264,8 +264,6 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
     {
         if (string.IsNullOrWhiteSpace(content))
             content = Config.values.hangmanMessageFormat;
-        if (await SlashCommands.ModGuard(ctx))
-            return;
 
         content = content.Replace("\\n", "\n");
 
@@ -273,9 +271,9 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
 
         Config.values.hangmanMessageLink = msg.JumpLink.OriginalString;
         Config.values.hangmanMessageFormat = content;
-        Config.WriteConfig();
-        await BoneBot.Bots[ctx.Client].hangman.FetchMessage();
-
+        Config.WriteConfig(); 
+        await ctx.ServiceProvider.GetModule<Hangman>().FetchMessage();
+        
         await ctx.RespondAsync("Created hangman message!", true);
     }
 
@@ -285,9 +283,6 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
     public static async Task StartHangman(SlashCommandContext ctx,
         [Parameter("word"), Description("Force the word to be one of your choosing")] string word = "")
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         if (string.IsNullOrWhiteSpace(Config.values.hangmanMessageFormat))
         {
             await ctx.RespondAsync("You need to create a hangman message first!", true);
@@ -300,7 +295,7 @@ internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        await BoneBot.Bots[ctx.Client].hangman.StartNewGame(word);
+        await ctx.ServiceProvider.GetModule<Hangman>().StartNewGame(word);
 
         await ctx.RespondAsync($"Started! Check [the hangman message](<{Config.values.hangmanMessageLink}>)!", true);
     }

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
 
-internal partial class ModuleBase
+public partial class ModuleBase
 {
     [DebuggerStepThrough]
     protected async void TryDeleteDontCare(DiscordMessage? msg, string? reason = null)

@@ -928,11 +928,12 @@ internal partial class Casino
         //     await ctx.RespondAsync("Hey... you kind of need to... include amounts for your side bets... for all of them...", true);
         //     return;
         // }
-
-        await BoneBot.Bots[ctx.Client].casino.BeginBlackjack(ctx, amount, zippedBets, false);
+        
+        var casino = (Casino)ctx.Client.ServiceProvider.GetService(typeof(Casino))!;
+        await casino.BeginBlackjack(ctx, amount, zippedBets, false);
     }
 
-    private static readonly string sideBetExplanation =
+    private static readonly string SideBetExplanation =
         string.Join(
             "\n",
             allSideBets.Select(sb =>
@@ -946,6 +947,6 @@ internal partial class Casino
     [Command("explainSideBets")]
     public static async Task ExplainSideBets(SlashCommandContext ctx)
     {
-        await ctx.RespondAsync(sideBetExplanation, true);
+        await ctx.RespondAsync(SideBetExplanation, true);
     }
 }

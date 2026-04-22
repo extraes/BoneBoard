@@ -30,33 +30,14 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
     }
 
     static Timer? sendTimer;
-    TimeOnly sendTime;
-    DateTime lastSend;
-    DiscordChannel? voteChannel;
-    DiscordChannel? outputChannel;
-    DiscordEmoji? voteEmoji;
+    static TimeOnly sendTime;
+    static DateTime lastSend;
+    static DiscordChannel? voteChannel;
+    static DiscordChannel? outputChannel;
+    static DiscordEmoji? voteEmoji;
 
     protected override async Task FetchGuildResources()
     {
-        if (!TimeOnly.TryParse(Config.values.imageRoyaleSendTime, out TimeOnly time))
-            Logger.Warn("Unable to parse image royale send time");
-
-        if (time != default && time != sendTime)
-        {
-            sendTime = time;
-
-            DateTime now = DateTime.Now;
-            DateTime next = new(now.Year, now.Month, sendTime.ToTimeSpan() < now.TimeOfDay ? now.Day + 1 : now.Day, sendTime.Hour, sendTime.Minute, sendTime.Second);
-            if (sendTimer is null)
-            {
-                // Logger.Warn("Creating new ImageRoyale timer, heres the callstack: " + Environment.StackTrace);
-                sendTimer = new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
-            }
-            sendTimer.Change(next - now, TimeSpan.FromDays(1));
-
-            Logger.Put($"Waiting {next - now} to send imageroyale", LogType.Debug);
-        }
-
         try
         {
             if (Config.values.imageRoyaleVotingChannel != default)
@@ -95,6 +76,28 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
             Logger.Error("Unable to set vote emoji for image royale", e);
         }
 
+    }
+
+    protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
+    {
+        if (!TimeOnly.TryParse(Config.values.imageRoyaleSendTime, out TimeOnly time))
+            Logger.Warn("Unable to parse image royale send time");
+        
+        if (time != default && time != sendTime)
+        {
+            sendTime = time;
+
+            DateTime now = DateTime.Now;
+            DateTime next = new(now.Year, now.Month, sendTime.ToTimeSpan() < now.TimeOfDay ? now.Day + 1 : now.Day, sendTime.Hour, sendTime.Minute, sendTime.Second);
+            if (sendTimer is null)
+            {
+                // Logger.Warn("Creating new ImageRoyale timer, heres the callstack: " + Environment.StackTrace);
+                sendTimer = new(SendTopImage, null, next - now, TimeSpan.FromDays(1));
+            }
+            sendTimer.Change(next - now, TimeSpan.FromDays(1));
+
+            Logger.Put($"Waiting {next - now} to send imageroyale", LogType.Debug);
+        }
     }
 
     private async void SendTopImage(object? state)
@@ -171,7 +174,7 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
                 if (PersistentData.values.imageRoyaleSubmissions.TryGetValue(userId, out ulong msgId) && msgId == topMessage.Id)
                 {
                     Logger.Put($"Giving user w/ ID {userId} points from winning Image Royale!");
-                    bot.casino.GivePoints(userId, 10 * 1000);
+                    bot.ServiceProvider.GetModule<Casino>().GivePoints(userId, 10_000);
                 }
             }
 
@@ -273,16 +276,14 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
     [Command("sendnow"), Description("Force-sends the top image immediately")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task SendNow(SlashCommandContext ctx)
+    public async Task SendNow(SlashCommandContext ctx)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
-        BoneBot.Bots[ctx.Client].imageRoyale.SendTopImage(null);
+        SendTopImage(null);
+        await ctx.RespondAsync("Done!", true);
     }
 
     [Command("submit"), Description("Submit an image or gif!")]
-    public static async Task Submit(SlashCommandContext ctx, DiscordAttachment image)
+    public async Task Submit(SlashCommandContext ctx, DiscordAttachment image)
     {
         if (ctx.User is not DiscordMember member || ctx.Guild is null)
         {
@@ -290,15 +291,13 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        if (!member.Roles.Any(r => r.Id == Config.values.imageRoyaleRole))
+        if (member.Roles.All(r => r.Id != Config.values.imageRoyaleRole))
         {
             await ctx.RespondAsync("https://tenor.com/view/ignore-this-pls-gif-24452155", true);
             return;
         }
-
-        ImageRoyale royale = BoneBot.Bots[ctx.Client].imageRoyale;
-
-        if (royale.voteChannel is null)
+        
+        if (voteChannel is null)
         {
             await ctx.RespondAsync("voting channel not set", true);
             return;
@@ -306,7 +305,7 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
 
         if (PersistentData.values.imageRoyaleSubmissions.TryGetValue(member.Id, out ulong preexistingMsgId))
         {
-            await ctx.RespondAsync($"you already submitted an image, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}/{preexistingMsgId})", true);
+            await ctx.RespondAsync($"you already submitted an image, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}/{preexistingMsgId})", true);
             return;
         }
 
@@ -343,8 +342,8 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
 
         try
         {
-            using var fs = File.OpenWrite(tmpPath);
-            using var stream = await Clint.GetStreamAsync(image.ProxyUrl);
+            await using var fs = File.OpenWrite(tmpPath);
+            await using var stream = await Clint.GetStreamAsync(image.ProxyUrl);
             await stream.CopyToAsync(fs);
         }
         catch (Exception e)
@@ -356,7 +355,7 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
 
         try
         {
-            using var fs = File.OpenRead(tmpPath);
+            await using var fs = File.OpenRead(tmpPath);
 
             var dumb = new DiscordMessageBuilder()
                 .WithContent($"CONTENDER {PersistentData.values.imageRoyaleSubmissions.Count + 1}")
@@ -364,14 +363,14 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
 
             Logger.Put($"{member} submitted a file originally named {image.FileName} to image royale");
                 
-            DiscordMessage msg = await royale.voteChannel.SendMessageAsync(dumb);
+            DiscordMessage msg = await voteChannel.SendMessageAsync(dumb);
             PersistentData.values.imageRoyaleSubmissions[member.Id] = msg.Id;
             PersistentData.WritePersistentData();
 
-            if (royale.voteEmoji is not null)
-                await BoneBot.TryReact(msg, royale.voteEmoji);
+            if (voteEmoji is not null)
+                await BoneBot.TryReact(msg, voteEmoji);
 
-            await ctx.RespondAsync($"submitted image, check https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}", true);
+            await ctx.RespondAsync($"submitted image, check https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}", true);
 
             try
             {
@@ -389,7 +388,11 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
             {
                 await ctx.RespondAsync("failed to send image to voting channel", true);
             }
-            catch { }
+            catch
+            {
+                // dnc
+            }
+
             return;
         }
         

@@ -180,9 +180,6 @@ internal partial class Casino
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task CreateEvent(SlashCommandContext ctx, string title, string criteria, int totalSeedAmount = 10_000)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-        
         PredictionEvent newEvent = new()
         {
             title = title,
@@ -203,9 +200,6 @@ internal partial class Casino
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task ModifyEvent(SlashCommandContext ctx, string originalTitle, string newTitle = "", string newCriteria = "")
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-        
         var target = await GetEventOrRespond(ctx, originalTitle);
         if (target is null)
             return;
@@ -236,9 +230,6 @@ internal partial class Casino
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task ResolveEvent(SlashCommandContext ctx, string title, Resolution resolution)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         var target = await GetEventOrRespond(ctx, title);
         if (target is null)
             return;
@@ -293,9 +284,6 @@ internal partial class Casino
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task UnlockEvent(SlashCommandContext ctx, string title, double openForHours)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         if (openForHours <= 0)
         {
             await ctx.RespondAsync($"It has to be open for *some* period of time, be serious now.", true);
@@ -391,9 +379,6 @@ internal partial class Casino
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
     public static async Task UnlockEvent(SlashCommandContext ctx)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
-
         predictionBoard = await ctx.Channel.SendMessageAsync("hi guys my names travis im 33 and i think nintendo is pretty cool");
         PersistentData.values.predictionBoardLink = predictionBoard.JumpLink.ToString();
         PersistentData.WritePersistentData();

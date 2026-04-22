@@ -4,22 +4,14 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using Newtonsoft.Json;
-using OpenAI;
 using OpenAI.Chat;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using DSharpPlus.Commands.ContextChecks;
 using WikiClientLibrary;
 using WikiClientLibrary.Client;
 using WikiClientLibrary.Generators;
 using WikiClientLibrary.Pages;
 using WikiClientLibrary.Sites;
-using static System.Net.WebRequestMethods;
 
 namespace BoneBoard.Modules.Blockers;
 
@@ -191,8 +183,10 @@ internal partial class WikiTopic : ModuleBase
             bool needReroll = true;
             while (page is null || needReroll)
             {
-                var pageGen = new RecentChangesGenerator(site);
-                pageGen.NamespaceIds = [ BuiltInNamespaces.Main ];
+                var pageGen = new RecentChangesGenerator(site)
+                {
+                    NamespaceIds = [ BuiltInNamespaces.Main ]
+                };
                 await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
                 {
                     Logger.Put($"\"Random\" (recently edited, lol) wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
@@ -233,16 +227,6 @@ internal partial class WikiTopic : ModuleBase
         {
             foreach (ulong channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
             {
-                // dont need to update message
-                //if (!statusMessages.TryGetValue(channelId, out var oldMsg) && PersistentData.values.wikiTopicAnnounceMessages.TryGetValue(channelId, out ulong oldMsgId))
-                //{
-                //    try
-                //    {
-                //        var channel = await bot.client.GetChannelAsync(channelId);
-                //        var msg = TryFetchMessage(channel, oldMsgId);
-                //    }
-                //    catch { }
-                //}
                 Logger.Put($"Posting new topic message in channel {channelId}");
                 var channel = await bot.client.GetChannelAsync(channelId);
                 var sentMsg = await channel.SendMessageAsync($"New topic!!! better read up on [{page.Title}](https://en.wikipedia.org/wiki/{Uri.EscapeDataString(page.Title!)}) {Formatter.Timestamp(TimeSpan.FromHours(HOURS_PER_TOPIC_CHANGE), TimestampFormat.RelativeTime)}");
@@ -256,16 +240,15 @@ internal partial class WikiTopic : ModuleBase
 
     [Command("set")]
     [Description("Set the topic for the next few hours (until the next topic switch should occur)")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task SetTopic(
         SlashCommandContext ctx,
         [Parameter("articleTitle")] string? articleTitle = null)
     {
-        if (await SlashCommands.ModGuard(ctx))
-            return;
 
 
         await ctx.DeferResponseAsync(true);
-        var wikitopic = BoneBot.Bots[ctx.Client].blockers.OfType<WikiTopic>().FirstOrDefault();
+        var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
         if (wikitopic is null)
         {
             await ctx.FollowupAsync("uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
@@ -279,15 +262,24 @@ internal partial class WikiTopic : ModuleBase
 
     [Command("ermmmmmMods")]
     [Description("@extraes WHY WAS MY MESSAGE DELETED I WAS ON TOPIC")] 
-    public static async Task AntiWhine(SlashCommandContext ctx, [Parameter("otherUser"), Description("Only usable if you're a moderator")] DiscordUser? target = null)
+    [RequireGuild]
+    public static async Task AntiWhine(SlashCommandContext ctx,
+        [Parameter("otherUser"), Description("Only usable if you're a moderator")]
+        DiscordUser? target = null)
     {
-        if (target != null && await SlashCommands.ModGuard(ctx))
+        bool isMod = ctx.Member is not null
+                     && ctx.Channel.PermissionsFor(ctx.Member).HasPermission(DiscordPermission.ManageMessages);
+        if (target != null && !isMod)
+        {
+            await ctx.RespondAsync("I said,\n# only usable if you're a moderator\nand you're not.", true);
             return;
+        }
+        
         target ??= ctx.User;
 
         await ctx.DeferResponseAsync(true);
 
-        var wikitopic = BoneBot.Bots[ctx.Client].blockers.OfType<WikiTopic>().FirstOrDefault();
+        var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
         if (wikitopic is null)
         {
             await ctx.FollowupAsync("uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
