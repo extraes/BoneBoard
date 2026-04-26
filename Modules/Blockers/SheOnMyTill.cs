@@ -5,11 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
+internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
 {
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
@@ -41,11 +42,16 @@ internal class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
 
         if (Quoter.Link.Replace(msg.Content, "") == "")
             return false;
+        Regex symbols = SymbolRegex();
+
+
+        string cleanContent = symbols.Replace(msg.Content, "");
 
         int lastIdx = 0;
         foreach (string formatPart in Config.values.theFormatInQuestion)
         {
-            int fmtIdx = msg.Content.IndexOf(formatPart, lastIdx, StringComparison.InvariantCultureIgnoreCase);
+            var part = symbols.Replace(formatPart, "");
+            int fmtIdx = cleanContent.IndexOf(part, lastIdx, StringComparison.InvariantCultureIgnoreCase);
             if (fmtIdx == -1)
             {
                 string fullFormat = string.Join(" [...] ", Config.values.theFormatInQuestion);
@@ -54,9 +60,12 @@ internal class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
                 return true;
             }
 
-            lastIdx = fmtIdx + formatPart.Length;
+            lastIdx = fmtIdx + part.Length;
         }
 
         return false;
     }
+
+    [GeneratedRegex(@"["",.']")]
+    private static partial Regex SymbolRegex();
 }
