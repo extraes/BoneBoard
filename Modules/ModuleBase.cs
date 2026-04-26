@@ -63,7 +63,9 @@ public abstract partial class ModuleBase
     {
         this.bot = bot;
         AllModules.Add(this);
-        bot.clientBuilder.ConfigureServices(x => x.AddSingleton(this.GetType(), this));
+        // avoid double registration
+        if (bot.clientBuilder is not null && AllModules.All(m => m.GetType() != GetType()))
+            bot.clientBuilder.ConfigureServices(x => x.AddSingleton(this.GetType(), this));
         bot.ConfigureEvents(x => x.HandleGuildDownloadCompleted(CheckAndInit));
 
         bot.ConfigureEvents(x => x
@@ -117,6 +119,7 @@ public abstract partial class ModuleBase
         return Task.CompletedTask;
     }
 
+    // ReSharper disable once EntityNameCapturedOnly.Local thats its entire point, jackass
     private MethodInfo InstanceMethod(Delegate target, [CallerArgumentExpression(nameof(target))] string methodName = "") => GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
                                                                                                                                 ?? throw new MissingMethodException(methodName);
 
