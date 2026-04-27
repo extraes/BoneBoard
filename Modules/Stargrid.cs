@@ -32,8 +32,8 @@ internal class Stargrid : ModuleBase
     DiscordChannel? outputChannel;
     public Stargrid(BoneBot bot) : base(bot)
     {
-        //todo: remove this, somehow reaction add events dont get fucking registered or their events arent propagated? idk
-        bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageReactionAdded(ReactionAdded));
+        //// todo: remove this, somehow reaction add events dont get fucking registered or their events arent propagated? idk
+        // bot.clientBuilder.ConfigureEventHandlers(x => x.HandleMessageReactionAdded(ReactionAdded));
     }
 
     protected override Task FetchGuildResources()
@@ -123,7 +123,7 @@ internal class Stargrid : ModuleBase
             Logger.Error("Exception while trying to send message for quote process's final step!", ex);
         }
     }
-
+    
     protected override async Task ReactionAdded(DiscordClient client, MessageReactionAddedEventArgs args)
     {
         await HandleQuoteeDeleteRequest(args);

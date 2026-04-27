@@ -57,7 +57,6 @@ internal class Confessional : ModuleBase
     public Confessional(BoneBot bot) : base(bot)
     {
         Config.ConfigChanged += () => { _confessionalChannel = null; };
-        bot.clientBuilder.ConfigureEventHandlers(x => x.HandleComponentInteractionCreated(DispatchInteractions));
 
         try
         {
@@ -76,7 +75,7 @@ internal class Confessional : ModuleBase
 
     }
 
-    private async Task DispatchInteractions(DiscordClient sender, ComponentInteractionCreatedEventArgs args)
+    protected override async Task ComponentInteractionCreated(DiscordClient client, ComponentInteractionCreatedEventArgs args)
     {
         if (string.IsNullOrEmpty(args.Interaction.Data.CustomId))
             return;
