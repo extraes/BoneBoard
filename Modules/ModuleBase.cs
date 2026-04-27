@@ -62,10 +62,13 @@ public abstract partial class ModuleBase
     public ModuleBase(BoneBot bot) : this()
     {
         this.bot = bot;
-        AllModules.Add(this);
         // avoid double registration
         if (bot.clientBuilder is not null && AllModules.All(m => m.GetType() != GetType()))
+        {
+            AllModules.Add(this);
             bot.clientBuilder.ConfigureServices(x => x.AddSingleton(this.GetType(), this));
+        }
+        
         bot.ConfigureEvents(x => x.HandleGuildDownloadCompleted(CheckAndInit));
 
         bot.ConfigureEvents(x => x
@@ -128,46 +131,57 @@ public abstract partial class ModuleBase
         bool hasBlocker = InstanceMethod(GlobalStopEventPropagation).DeclaringType == GetType();
         var handlersThatNeedRegistering = new List<(bool needsRegister, Action<EventHandlingBuilder> builder, string eventName)>
         {
-            (InstanceMethod(GuildDownloadCompleted).DeclaringType == GetType()  , builder => 
-                {
-                    builder.HandleGuildDownloadCompleted(GuildDownloadCompletedEvent);
-                    Logger.Put($"Registered an event for {GetType()} -- GuildDownloadCompletedEvent");
-                }, "GuildDownloadCompleted"),
-            (InstanceMethod(MessageCreated).DeclaringType == GetType()          , builder => 
-            {
-                builder.HandleMessageCreated(MessageCreatedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- MessageCreatedEvent");
-            }                , "MessageCreated"),
-            (InstanceMethod(MessageUpdated).DeclaringType == GetType()          , builder => 
-            {
-                builder.HandleMessageUpdated(MessageUpdatedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- MessageUpdatedEvent");
-            }                , "MessageUpdated"),
-            (InstanceMethod(ReactionAdded).DeclaringType == GetType()           , builder => 
-            {
-                builder.HandleMessageReactionAdded(ReactionAddedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- ReactionAddedEvent");
-            }           , "ReactionAdded"),
-            (InstanceMethod(ChannelCreated).DeclaringType == GetType()          , builder => 
-            {
-                builder.HandleChannelCreated(ChannelCreatedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- ChannelCreatedEvent");
-            }                , "ChannelCreated"),
-            (InstanceMethod(ThreadCreated).DeclaringType == GetType()           , builder => 
-            {
-                builder.HandleThreadCreated(ThreadCreatedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- ThreadCreatedEvent");
-            }                  , "ThreadCreated"),
-            (InstanceMethod(SessionCreated).DeclaringType == GetType()          , builder => 
-            {
-                builder.HandleSessionCreated(SessionCreatedEvent);
-                Logger.Put($"Registered an event for {GetType()} -- SessionCreatedEvent");
-            }                , "SessionCreated"),
-            (InstanceMethod(UnknownEvent).DeclaringType == GetType()            , builder => 
-            {
-                builder.HandleUnknownEvent(UnknownEventEvent);
-                Logger.Put($"Registered an event for {GetType()} -- UnknownEventEvent");
-            }                    , "UnknownEvent"),
+            (InstanceMethod(GuildDownloadCompleted).DeclaringType == GetType(), 
+                builder => builder.HandleGuildDownloadCompleted(GuildDownloadCompletedEvent),
+                "GuildDownloadCompleted"),
+            (InstanceMethod(MessageCreated).DeclaringType == GetType(), 
+                builder => builder.HandleMessageCreated(MessageCreatedEvent),
+                "MessageCreated"),
+            (InstanceMethod(MessageUpdated).DeclaringType == GetType(), 
+                builder => builder.HandleMessageUpdated(MessageUpdatedEvent),
+                "MessageUpdated"),
+            (InstanceMethod(MessageDeleted).DeclaringType == GetType(), 
+                builder => builder.HandleMessageDeleted(MessageDeletedEvent),
+                "MessageDeleted"),
+            (InstanceMethod(MessagesBulkDeleted).DeclaringType == GetType(), 
+                builder => builder.HandleMessagesBulkDeleted(MessagesBulkDeletedEvent),
+                "MessagesBulkDeleted"),
+            (InstanceMethod(ReactionAdded).DeclaringType == GetType(), 
+                builder => builder.HandleMessageReactionAdded(ReactionAddedEvent),
+                "ReactionAdded"),
+            (InstanceMethod(ReactionRemoved).DeclaringType == GetType(), 
+                builder => builder.HandleMessageReactionRemoved(ReactionRemovedEvent),
+                "ReactionRemoved"),
+            (InstanceMethod(GuildMemberAdded).DeclaringType == GetType(),
+                builder => builder.HandleGuildMemberAdded(GuildMemberAddedEvent),
+                "GuildMemberAdded"),
+            (InstanceMethod(GuildMemberUpdated).DeclaringType == GetType(), 
+                builder => builder.HandleGuildMemberUpdated(GuildMemberUpdatedEvent),
+                "GuildMemberUpdated"),
+            (InstanceMethod(ChannelCreated).DeclaringType == GetType(), 
+                builder => builder.HandleChannelCreated(ChannelCreatedEvent),
+                "ChannelCreated"),
+            (InstanceMethod(ThreadCreated).DeclaringType == GetType(), 
+                builder => builder.HandleThreadCreated(ThreadCreatedEvent),
+                "ThreadCreated"),
+            (InstanceMethod(SessionCreated).DeclaringType == GetType(), 
+                builder => builder.HandleSessionCreated(SessionCreatedEvent),
+                "SessionCreated"),
+            (InstanceMethod(GuildAuditLogCreated).DeclaringType == GetType(), 
+                builder => builder.HandleGuildAuditLogCreated(GuildAuditLogCreatedEvent),
+                "GuildAuditLogCreated"),
+            (InstanceMethod(InteractionCreated).DeclaringType == GetType(), 
+                builder => builder.HandleInteractionCreated(InteractionCreatedEvent),
+                "InteractionCreated"),
+            (InstanceMethod(ComponentInteractionCreated).DeclaringType == GetType(), 
+                builder => builder.HandleComponentInteractionCreated(ComponentInteractionCreatedEvent),
+                "ComponentInteractionCreated"),
+            (InstanceMethod(ModalSubmitted).DeclaringType == GetType(), 
+                builder => builder.HandleModalSubmitted(ModalSubmittedEvent),
+                "ModalSubmitted"),
+            (InstanceMethod(UnknownEvent).DeclaringType == GetType(), 
+                builder => builder.HandleUnknownEvent(UnknownEventEvent),
+                "UnknownEvent"),
         };
 
         Logger.Put($"Now registering event handlers for {GetType().Name}", LogType.Debug);

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
+
 // done to avoid this reflection shit being in scope everywhere
 file static class ReflectionHelper
 {
@@ -30,6 +31,7 @@ public abstract partial class ModuleBase
         MessagesBulkDeletedEvent =         async (c, a) => { if (!DontPropagate.Contains(a)) await MessagesBulkDeleted(c, a);         };
         ReactionAddedEvent =               async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionAdded(c, a);          };
         ReactionRemovedEvent =             async (c, a) => { if (!DontPropagate.Contains(a)) await ReactionRemoved(c, a);        };
+        GuildMemberAddedEvent =            async (c, a) => { if (!DontPropagate.Contains(a)) await GuildMemberAdded(c, a);                  };
         GuildMemberUpdatedEvent =          async (c, a) => { if (!DontPropagate.Contains(a)) await GuildMemberUpdated(c, a);     };
         ChannelCreatedEvent =              async (c, a) => { if (!DontPropagate.Contains(a)) await ChannelCreated(c, a);         };
         ThreadCreatedEvent =               async (c, a) => { if (!DontPropagate.Contains(a)) await ThreadCreated(c, a);          };
@@ -68,7 +70,11 @@ public abstract partial class ModuleBase
     static readonly MethodInfo BaseReactionRemoved = ReflectionHelper.GetMethod(nameof(ReactionRemoved));
     private Func<DiscordClient, MessageReactionRemovedEventArgs, Task> ReactionRemovedEvent;
     protected virtual Task ReactionRemoved(DiscordClient client, MessageReactionRemovedEventArgs args) => Task.CompletedTask;
-    
+
+    static readonly MethodInfo BaseGuildMemberAdded = ReflectionHelper.GetMethod(nameof(GuildMemberAdded));
+    private Func<DiscordClient, GuildMemberAddedEventArgs, Task> GuildMemberAddedEvent;
+    protected virtual Task GuildMemberAdded(DiscordClient client, GuildMemberAddedEventArgs args) => Task.CompletedTask;
+
     static readonly MethodInfo BaseGuildMemberUpdated = ReflectionHelper.GetMethod(nameof(GuildMemberUpdated));
     private Func<DiscordClient, GuildMemberUpdatedEventArgs, Task> GuildMemberUpdatedEvent;
     protected virtual Task GuildMemberUpdated(DiscordClient client, GuildMemberUpdatedEventArgs args) => Task.CompletedTask;
