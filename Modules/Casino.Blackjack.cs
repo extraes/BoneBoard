@@ -67,7 +67,7 @@ file static class BlackjackUtils
     
     public static List<(Casino.SideBet bet, int amount)> DeserializeSideBetString(string isolatedString)
     {
-        return isolatedString.Split('|').Select(DeserializeBet).ToList();
+        return isolatedString.Split('|').Where(str => !string.IsNullOrWhiteSpace(str)).Select(DeserializeBet).ToList();
     }
 
     private static string StringifyBet(Casino.SideBet bet, int amount)
