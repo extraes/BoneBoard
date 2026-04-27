@@ -17,7 +17,7 @@ namespace BoneBoard.Modules;
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("casino")]
-internal partial class Casino : ModuleBase
+internal partial class Casino(BoneBot bot) : ModuleBase(bot)
 {
     // bb.bj.{2: followup id}.{3: user id}.{4: dealer hand}.{5: player hand}.{6: wager}.{7: action} (.Split idx's)
 
@@ -38,15 +38,7 @@ internal partial class Casino : ModuleBase
     static TimeSpan pointsTimeout = TimeSpan.FromMinutes(15);
     Dictionary<DiscordUser, DateTime> lastTimePointsGotten = new();
 
-    public Casino(BoneBot bot) : base(bot)
-    {
-        bot.ConfigureEvents(e =>
-        {
-            e.HandleComponentInteractionCreated(DispatchInteractions);
-        });
-    }
-
-    private async Task DispatchInteractions(DiscordClient sender, ComponentInteractionCreatedEventArgs args)
+    protected override async Task ComponentInteractionCreated(DiscordClient client, ComponentInteractionCreatedEventArgs args)
     {
         if (string.IsNullOrEmpty(args.Interaction.Data.CustomId))
             return;

@@ -929,7 +929,7 @@ internal partial class Casino
         //     return;
         // }
         
-        var casino = (Casino)ctx.Client.ServiceProvider.GetService(typeof(Casino))!;
+        var casino = ctx.ServiceProvider.GetModule<Casino>();
         await casino.BeginBlackjack(ctx, amount, zippedBets, false);
     }
 
