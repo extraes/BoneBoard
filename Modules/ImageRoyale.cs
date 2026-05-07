@@ -276,14 +276,21 @@ internal class ImageRoyale(BoneBot bot) : ModuleBase(bot)
     [Command("sendnow"), Description("Force-sends the top image immediately")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task SendNow(SlashCommandContext ctx)
+    public static async Task SendNow(SlashCommandContext ctx)
     {
-        SendTopImage(null);
+        var royale = BoneBot.FindModule<ImageRoyale>(ctx.Guild);
+        if (royale is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
+        royale.SendTopImage(null);
         await ctx.RespondAsync("Done!", true);
     }
 
     [Command("submit"), Description("Submit an image or gif!")]
-    public async Task Submit(SlashCommandContext ctx, DiscordAttachment image)
+    public static async Task Submit(SlashCommandContext ctx, DiscordAttachment image)
     {
         if (ctx.User is not DiscordMember member || ctx.Guild is null)
         {

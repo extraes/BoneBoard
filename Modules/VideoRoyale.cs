@@ -11,6 +11,7 @@ using DSharpPlus.Entities;
 using DSharpPlus;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Commands.ContextChecks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BoneBoard.Modules;
 
@@ -247,29 +248,38 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
     [Command("sendnow"), Description("Force-sends the top video immediately")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task SendNow(SlashCommandContext ctx)
+    public static async Task SendNow(SlashCommandContext ctx)
     {
-        SendTopVideo(null);
+        var royale = BoneBot.FindModule<VideoRoyale>(ctx.Guild);
+        if (royale is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
+        royale.SendTopVideo(null);
 
         await ctx.RespondAsync("Done!", true);
     }
 
     [Command("submit"), Description("Submit a video!")]
-    public async Task Submit(SlashCommandContext ctx, DiscordAttachment video)
+    [RequireGuild]
+    public static async Task Submit(SlashCommandContext ctx, DiscordAttachment video)
     {
-        if (ctx.User is not DiscordMember member || ctx.Guild is null)
+        var royale =  BoneBot.FindModule<VideoRoyale>(ctx.Guild);
+        if (ctx.User is not DiscordMember member || ctx.Guild is null || royale is null)
         {
             await ctx.RespondAsync("😂👎", true);
             return;
         }
-
+        
         if (member.Roles.All(r => r.Id != Config.values.videoRoyaleSubmitRole))
         {
             await ctx.RespondAsync("https://tenor.com/view/ignore-this-pls-gif-24452155", true);
             return;
         }
 
-        if (voteChannel is null)
+        if (royale.voteChannel is null)
         {
             await ctx.RespondAsync("voting channel not set", true);
             return;
@@ -277,7 +287,7 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
 
         if (PersistentData.values.videoRoyaleSubmissions.TryGetValue(member.Id, out ulong preexistingMsgId))
         {
-            await ctx.RespondAsync($"you already submitted a video, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}/{preexistingMsgId})", true);
+            await ctx.RespondAsync($"you already submitted a video, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}/{preexistingMsgId})", true);
             return;
         }
 
@@ -335,14 +345,14 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
 
             Logger.Put($"{member} submitted a file originally named {video.FileName} to video royale");
                 
-            DiscordMessage msg = await voteChannel.SendMessageAsync(dumb);
+            DiscordMessage msg = await royale.voteChannel.SendMessageAsync(dumb);
             PersistentData.values.videoRoyaleSubmissions[member.Id] = msg.Id;
             PersistentData.WritePersistentData();
 
-            if (voteEmoji is not null)
-                await BoneBot.TryReact(msg, voteEmoji);
+            if (royale.voteEmoji is not null)
+                await BoneBot.TryReact(msg, royale.voteEmoji);
 
-            await ctx.RespondAsync($"submitted video, check https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}", true);
+            await ctx.RespondAsync($"submitted video, check https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}", true);
 
             try
             {

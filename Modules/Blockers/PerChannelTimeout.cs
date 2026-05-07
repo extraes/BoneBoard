@@ -65,7 +65,7 @@ internal class PerChannelTimeout(BoneBot bot) : ModuleBase(bot)
     [Command("setmute")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.ManageMessages], [DiscordPermission.ModerateMembers])]
-    public async Task Timeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member, TimeSpan duration)
+    public static async Task Timeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member, TimeSpan duration)
     {
         if (!PersistentData.values.channelTimeoutEndTimes.TryGetValue(ctx.Channel.Id, out var userEndTimesInChannel))
         {
@@ -82,7 +82,7 @@ internal class PerChannelTimeout(BoneBot bot) : ModuleBase(bot)
     [Command("unmute")]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.ManageMessages], [DiscordPermission.ModerateMembers])]
-    public async Task Untimeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member)
+    public static async Task Untimeout(SlashCommandContext ctx, [RequireHigherBotHierarchy] DiscordMember member)
     {
         if (!PersistentData.values.channelTimeoutEndTimes.TryGetValue(ctx.Channel.Id, out var userEndTimesInChannel))
         {

@@ -75,7 +75,8 @@ internal class Haiku : ModuleBase
         string haikuSerialize = line1 + line2 + line3;
         ulong authorId = msg.Author?.Id ?? 0;
         // exempt owners bc it could contain a dev whos testing shit
-        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !Config.values.owners.Contains(authorId) &&
+        bool isOwner = bot.client.CurrentApplication.Owners?.Any(u => u.Id == authorId) ?? false;
+        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && isOwner &&
             !msg.IsEdited /* editing a valid message shouldnt result in deletion */)
         {
             TryDeleteDontCare(msg,

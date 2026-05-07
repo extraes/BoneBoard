@@ -5,8 +5,10 @@ namespace BoneBoard;
 public class ServerConfig
 {
     public ulong logChannel;
-    public ulong[] quotingRequiredRoles = Array.Empty<ulong>();
-    public ulong[] requiredEmojis = Array.Empty<ulong>();
+    
+    [TomlPrecedingComment("Quoting settings")]
+    public ulong[] quotingRequiredRoles = [];
+    public ulong[] quotingRequiredEmojis = [];
     public int requiredReactionCount = 3;
     [TomlInlineComment("https://discord.com/channels/563139253542846474/1153819135067832370/1283700275617468416")]
     public string quoteeDeleteEmoji = "emoji id, like 1283700275617468416";
@@ -27,5 +29,5 @@ public class ServerConfig
     {
         {"1", [ "" ]},
     };
-    public ulong[] channelsWhereNoVowelsAreAllowed = Array.Empty<ulong>();
+    public ulong[] channelsWhereNoVowelsAreAllowed = [];
 }

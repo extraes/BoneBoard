@@ -591,12 +591,19 @@ internal class Confessional : ModuleBase
     [Command("sendAiConfession"), Description("Sends an AI confession.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task TestSendAiConfession(SlashCommandContext ctx)
+    public static async Task TestSendAiConfession(SlashCommandContext ctx)
     {
+        var confessional = BoneBot.FindModule<Confessional>(ctx.Guild);
+        if (confessional is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
         Logger.Put($"Prompting AI confession at the request of {ctx.User}.");
         await ctx.DeferResponseAsync(true);
 
-        await SendAiConfessional();
+        await confessional.SendAiConfessional();
 
         await ctx.FollowupAsync("Attempted AI confession.");
     }

@@ -351,9 +351,16 @@ internal class Stargrid : ModuleBase
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
+    public static async Task ForceQuoteSilent(SlashCommandContext ctx, DiscordMessage msg)
     {
         if (ctx.Member is null || !ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
+        {
+            await ctx.RespondAsync("nuh uh", true);
+            return;
+        }
+        
+        var stargrid = BoneBot.FindModule<Stargrid>(ctx.Member);
+        if (stargrid is null)
         {
             await ctx.RespondAsync("nuh uh", true);
             return;
@@ -370,8 +377,8 @@ internal class Stargrid : ModuleBase
         {
             Logger.Put("Caught exception when refetching message: " + e.Message);
         }
-
-        await PerformQuote(msg, null);
+        
+        await stargrid.PerformQuote(msg, null);
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }
 
@@ -379,15 +386,16 @@ internal class Stargrid : ModuleBase
     [SlashCommandTypes(DiscordApplicationCommandType.MessageContextMenu)]
     [RequireGuild]
     [RequirePermissions([DiscordPermission.AddReactions], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
+    public static async Task ForceQuote(SlashCommandContext ctx, DiscordMessage msg)
     {
         if (ctx.Member is null)
         {
             await ctx.RespondAsync("😂👎", true);
             return;
         }
-
-        if (!ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
+        
+        var stargrid = BoneBot.FindModule<Stargrid>(ctx.Member);
+        if (stargrid is null || !ctx.Member.Permissions.HasAllPermissions(ForceQuotePerms))
         {
             await ctx.RespondAsync("nuh uh", true);
             return;
@@ -414,7 +422,7 @@ internal class Stargrid : ModuleBase
             return;
         }
 
-        await PerformQuote(msg, emoji);
+        await stargrid.PerformQuote(msg, emoji);
 
         await ctx.FollowupAsync("Done! Hopefully.", true);
     }

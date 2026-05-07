@@ -851,7 +851,8 @@ internal partial class Casino
         }
 
         sb.AppendLine("`");
-        sb.AppendLine($"Your hand value: **{Cards.HandValue(playerHand)}**");
+        int playerHandValue = Cards.HandValue(playerHand);
+        sb.AppendLine($"Your hand value: **{playerHandValue}**");
 
         if (zippedBets.Count != 0)
         {
@@ -869,6 +870,10 @@ internal partial class Casino
                 double currentEval = SideBetEvaluators[bet].Invoke(dealerHand, playerHand);
                 
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
+                if (currentEval == SIDE_BET_INDETERMINATE && playerHandValue > 21)
+                    currentEval = SIDE_BET_FAILED;
+                
+                // ReSharper disable once CompareOfFloatsByEqualityOperator
                 double displayEval = pastEval == SIDE_BET_INDETERMINATE ? currentEval : pastEval;
 
                 string evalString = displayEval switch
@@ -879,6 +884,7 @@ internal partial class Casino
                     _ => $"Won {(int)Math.Round(displayEval*amount)} points!"
                 };
                 sb.AppendLine($"-# **{name}**: {evalString}");
+                bets.Add(bet);
             }
         }
 

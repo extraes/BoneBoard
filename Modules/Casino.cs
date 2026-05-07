@@ -218,7 +218,13 @@ internal partial class Casino(BoneBot bot) : ModuleBase(bot)
         [Parameter("amount"), Description("How many points to gamble.")] int amount,
         [Parameter("sendSecretly"), Description("Whether to only show to you.")] bool ephemeral = true)
     {
-        var casino = (Casino)BoneBot.Bots[ctx.Client].ServiceProvider.GetService(typeof(Casino))!;
+        var casino = BoneBot.FindModule<Casino>(ctx.Guild);
+        if (casino is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
         await casino.GambleSlots(ctx, amount, ephemeral);
     }
 

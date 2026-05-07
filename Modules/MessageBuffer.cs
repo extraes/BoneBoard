@@ -311,9 +311,16 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
     [Description("Starts the timer to un-buffer messages sent during buffer-time")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task StartUnbufferTimer(SlashCommandContext ctx)
+    public static async Task StartUnbufferTimer(SlashCommandContext ctx)
     {
-        StartUnbufferTimer();
+        var msgBuff = BoneBot.FindModule<MessageBuffer>(ctx.Guild);
+        if (msgBuff is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
+        msgBuff.StartUnbufferTimer();
         var timestamp = Formatter.Timestamp(DateTime.Now.AddMinutes(Config.values.bufferTimeMinutes),
             TimestampFormat.ShortTime);
 
@@ -342,11 +349,18 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
     [Description("Immediately flushes buffered messages. Doesn't stop the timer.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public async Task FlushBufferedMessages(SlashCommandContext ctx)
+    public static async Task FlushBufferedMessages(SlashCommandContext ctx)
     {
+        var msgBuff = BoneBot.FindModule<MessageBuffer>(ctx.Guild);
+        if (msgBuff is null)
+        {
+            await ctx.RespondAsync("Sorry, I'm missing some important information...");
+            return;
+        }
+        
         await ctx.DeferResponseAsync(true);
 
-        await SendBufferedMessages();
+        await msgBuff.SendBufferedMessages();
 
         var builder = new DiscordFollowupMessageBuilder().WithContent("Flushed buffered messages in all servers 👍.");
         await ctx.FollowupAsync(builder);

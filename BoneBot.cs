@@ -25,7 +25,7 @@ public class BoneBot
 
     public static Dictionary<DiscordClient, BoneBot> Bots { get; } = new();
 
-    internal IServiceProvider ServiceProvider;
+    internal IServiceProvider ServiceProvider => client.ServiceProvider;
     
     /// <summary>
     /// Will be null after client creation to avoid silent failures.
@@ -33,6 +33,45 @@ public class BoneBot
     internal DiscordClientBuilder? clientBuilder;
     internal DiscordClient client;
     DiscordUser User => client.CurrentUser;
+    
+    
+    public static BoneBot? GetInstanceFromCurrentUser(DiscordUser? currUser)
+    {
+        if (currUser is null)
+            return null;
+        
+        foreach (var bot in Bots.Values)
+        {
+            if (bot?.client?.CurrentUser is null)
+                continue;
+            
+            if (bot.client.CurrentUser.Id == currUser.Id)
+                return bot;
+        }
+
+        return null;
+    }
+
+    public static BoneBot? GetInstanceFromGuild(DiscordGuild? guild)
+        => GetInstanceFromCurrentUser(guild?.CurrentMember);
+    
+    public static BoneBot? GetInstanceFromOtherMember(DiscordMember? member)
+        => GetInstanceFromCurrentUser(member?.Guild.CurrentMember);
+    
+    public static TModule? FindModule<TModule>(DiscordGuild? guild) where TModule : ModuleBase
+        => GetInstanceFromGuild(guild)?.GetModule<TModule>();
+    
+    public static TModule? FindModule<TModule>(DiscordMember? member) where TModule : ModuleBase
+        => GetInstanceFromOtherMember(member)?.GetModule<TModule>();
+    
+    public static TModule? FindModuleFromCurrUser<TModule>(DiscordUser? user) where TModule : ModuleBase
+        => GetInstanceFromCurrentUser(user)?.GetModule<TModule>();
+    
+    public TModule? GetModule<TModule>() where TModule : ModuleBase
+    {
+        var moduleObj = client?.ServiceProvider.GetService<TModule>();
+        return moduleObj;
+    }
 
     internal Configured<OpenAIClient?> OpenAI = new(() =>
     {
@@ -108,7 +147,6 @@ public class BoneBot
         
         client = clientBuilder.Build();
         clientBuilder = null;
-        ServiceProvider = client.ServiceProvider;
 
         Bots.Add(client, this);
     }

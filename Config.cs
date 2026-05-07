@@ -22,14 +22,12 @@ internal class Config
     public string logPath = "./logs/";
 
     public string quoteFont = "Comfortaa";
-
     
     public string[] ignoreDiscordLogsWith = [ "unknown event" ];
     public string[] ignoreDiscordLogsFrom = [ "HttpClient" ];
     public bool logDiscordDebug = false;
     
     public ulong[] blockedUsers = [];
-    public ulong[] owners = [];
     public ulong[] requiredRoles = [];
     public ulong[] requiredEmojis = [];
     public int requiredReactionCount = 3;

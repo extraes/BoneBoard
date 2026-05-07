@@ -13,6 +13,7 @@ All intended to run in only one server, though.
 - ImageRoyale.cs & VideoRoyale.cs: Vote on your favorite image/video, winner gets sent in a configurable channel
 - MessageBuffer.cs: Peak of mid, ngl. Buffer messages for a certain amount of time, then send them in a channel.
 - Hangman.cs: Hangman!
+- And more! I don't really revisit the readme very often, you can just check what modules there are
 
 ### Running it yourself
 

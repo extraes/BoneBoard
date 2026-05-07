@@ -24,9 +24,9 @@
     <PackageReference Include="CircularBuffer" Version="1.4.0" />
     <PackageReference Include="Csv" Version="2.0.217" />
     <PackageReference Include="CXuesong.MW.WikiClientLibrary" Version="0.9.0-int.3" />
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02584" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02584" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02584" />
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02587" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02587" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02587" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.5.25277.114" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0-preview.5.25277.114" />
