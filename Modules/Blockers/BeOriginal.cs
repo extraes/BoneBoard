@@ -27,7 +27,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         DiscordEmoji.FromUnicode("🔟"),
     ];
 
-    private Stopwatch sw = new Stopwatch();
+    private readonly Stopwatch sw = new Stopwatch();
     private static TimeSpan elapsedTime = TimeSpan.Zero;
     private static int processedMessages = 0;
     private static int levDistCounts = 0;
@@ -144,7 +144,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
 
     [Command("toggleDryRun")]
     [RequirePermissions([], [DiscordPermission.ManageMessages])]
-    private static async Task SetDryRun(SlashCommandContext ctx, bool newValue)
+    public static async Task SetDryRun(SlashCommandContext ctx, bool newValue)
     {
         bool oldValue = Config.values.isOriginalityInDryRun;
         Config.values.isOriginalityInDryRun = newValue;
@@ -156,7 +156,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
     [Command("setLevDist")]
     [RequirePermissions([], [DiscordPermission.ManageMessages])]
     [RequireApplicationOwner]
-    private static async Task SetLevDist(SlashCommandContext ctx, int newValue)
+    public static async Task SetLevDist(SlashCommandContext ctx, int newValue)
     {
         int oldValue = Config.values.originalityLevDist;
         Config.values.originalityLevDist = newValue;
@@ -168,7 +168,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
     
     [Command("getTimingInfo")]
     [RequirePermissions([], [DiscordPermission.ManageMessages])]
-    private static async Task SetDryRun(SlashCommandContext ctx)
+    public static async Task SetDryRun(SlashCommandContext ctx)
     {
         await ctx.RespondAsync($"Processed {processedMessages} messages over a combined {elapsedTime.TotalSeconds:0.00} seconds.\n" +
                                $"This involved {levDistCounts} ({levDistCounts / 1000.0:0.0}K) levenshtein distance calculations.", true);
