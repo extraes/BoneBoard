@@ -88,7 +88,7 @@ internal class PersistentData
     private static readonly Stopwatch Timer = new();
     public static void WritePersistentData()
     {
-        Logger.Put($"Writing persistent data to disk.", LogType.Debug);
+        // Logger.Put($"Writing persistent data to disk.", LogType.Debug);
         TimeSpan serialize;
         TimeSpan write;
         
