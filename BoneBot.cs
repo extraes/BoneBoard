@@ -167,6 +167,8 @@ public class BoneBot
         new SheOnMyTill(this);
         new Haiku(this);
         new WikiTopic(this);
+        new NicknameEnforcer(this);
+        new BeOriginal(this);
                 
         // Non-blockers
         new Casino(this);
