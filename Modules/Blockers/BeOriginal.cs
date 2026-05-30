@@ -171,6 +171,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
     public static async Task SetDryRun(SlashCommandContext ctx)
     {
         await ctx.RespondAsync($"Processed {processedMessages} messages over a combined {elapsedTime.TotalSeconds:0.00} seconds.\n" +
-                               $"This involved {levDistCounts} ({levDistCounts / 1000.0:0.0}K) levenshtein distance calculations.", true);
+                               $"This involved {levDistCounts} ({levDistCounts / 1000.0:0.0}K) levenshtein distance calculations, " +
+                               $"representing an average of {processedMessages/(double)levDistCounts} calculations per message.", true);
     }
 }
