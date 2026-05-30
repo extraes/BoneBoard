@@ -71,7 +71,8 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         cleanContent = Quoter.UserMention.Replace(cleanContent, "<mention>");
         cleanContent = Whitespace.Replace(cleanContent, " ");
         
-        int minLevDist = Config.values.originalityLevDist + 1;
+        int minLevDist = Config.values.isOriginalityInDryRun ? NumberEmojis.Length : (Config.values.originalityLevDist +
+            1);
         string minLevDistStr = "<None>";
         int levDistCalcs = 0;
         
@@ -111,12 +112,11 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
 
         if (Config.values.isOriginalityInDryRun)
         {
-            // num exists in NumberEmojis array 
-            if (minLevDist < NumberEmojis.Length)
+            // num exists in NumberEmojis array & a comparison was made
+            if (minLevDist < NumberEmojis.Length && levDistCounts != 0)
             {
                 _ = TryReact(msg, NumberEmojis[minLevDist]);
             }
-            
         }
         
         // There are more differences than the allowed amount
