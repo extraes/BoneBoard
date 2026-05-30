@@ -120,7 +120,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         }
         
         // There are more differences than the allowed amount
-        if (minLevDist > Config.values.originalityLevDist)
+        if (minLevDist < Config.values.originalityLevDist)
         {
             if (Config.values.isOriginalityInDryRun)
             {
