@@ -4,6 +4,7 @@ using DSharpPlus.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -54,7 +55,7 @@ public partial class ModuleBase
         catch (DiscordException ex)
         {
             //could possibly return it?
-            Logger.Warn($"{GetType().Name} failed to delete message {msg}\n\t{ex}");
+            Logger.Warn($"{GetType().Name} failed to delete message {msg}", ex);
             return false;
         }
     }
@@ -70,7 +71,23 @@ public partial class ModuleBase
         catch (DiscordException ex)
         {
             //could possibly return it?
-            Logger.Warn($"{GetType().Name} failed to delete {reaction} reaction from {user} on message {msg}\n\t{ex}");
+            Logger.Warn($"{GetType().Name} failed to delete {reaction} reaction from {user} on message {msg}", ex);
+            return false;
+        }
+    }
+    
+    [DebuggerStepThrough]
+    protected async Task<bool> TryReact(DiscordMessage msg, DiscordEmoji reaction)
+    {
+        try
+        {
+            await msg.CreateReactionAsync(reaction);
+            return true;
+        }
+        catch (DiscordException ex)
+        {
+            //could possibly return it?
+            Logger.Warn($"{GetType().Name} failed to react with {reaction} to message {msg}", ex);
             return false;
         }
     }
@@ -89,6 +106,7 @@ public partial class ModuleBase
         }
     }
 
+    [SuppressMessage("ReSharper", "EmptyGeneralCatchClause")]
     protected DiscordUser? GetUser(DiscordEventArgs args)
     {
         dynamic dynargs = args;

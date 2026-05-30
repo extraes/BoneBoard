@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
@@ -54,6 +55,8 @@ internal class PersistentData
     public List<string> stickiedMessages = new();
     
     public Dictionary<ulong, Dictionary<ulong, DateTime>> channelTimeoutEndTimes = new(); // channel id -> user id -> expiry time
+
+    public Dictionary<ulong, Dictionary<ulong, string>> uniqueChannelsMessages = new(); // channel id -> msg id -> cleaned content
     
     static PersistentData()
     {
@@ -82,10 +85,26 @@ internal class PersistentData
         Logger.Put($"Read persistent data from disk.", LogType.Debug);
     }
 
+    private static readonly Stopwatch Timer = new();
     public static void WritePersistentData()
     {
         Logger.Put($"Writing persistent data to disk.", LogType.Debug);
-        File.WriteAllText(PD_PATH, JsonConvert.SerializeObject(values, Formatting.Indented));
+        TimeSpan serialize;
+        TimeSpan write;
+        
+        Timer.Restart();
+        string serializedString = JsonConvert.SerializeObject(values, Formatting.Indented);
+        Timer.Stop();
+        serialize = Timer.Elapsed;
+        
+        Timer.Restart();
+        File.WriteAllText(PD_PATH, serializedString);
+        Timer.Stop();
+        write = Timer.Elapsed;
+        
         PersistentDataChanged?.Invoke();
+        Logger.Put($"Wrote persistent data to disk in {(serialize + write).Seconds:0.00}s " +
+                   $"({(int)serialize.TotalMilliseconds}ms serializing, " +
+                   $"{(int)write.TotalMilliseconds}ms writing)");
     }
 }

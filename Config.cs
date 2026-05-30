@@ -140,6 +140,14 @@ internal class Config
 
     public List<ulong> channelsWhereBotReimplementsSlowmode = new();
     
+    public ulong[] channelsWhereNicknameMustFollowFormat = [];
+    public string[] nicknameFormatInQuestion = [];
+
+    public ulong[] channelsWhereMessagesMustBeOriginal = [];
+    public bool isOriginalityInDryRun = true;
+    [TomlInlineComment("Roughly corresponds to characters of difference.")]
+    public int originalityLevDist = 4;
+    
     static Config()
     {
         Console.WriteLine("Initializing config");

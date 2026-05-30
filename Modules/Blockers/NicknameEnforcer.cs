@@ -1,4 +1,4 @@
-﻿using DSharpPlus;
+using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using System;
@@ -10,47 +10,55 @@ using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 
-internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
+internal partial class NicknameEnforcer(BoneBot bot) : ModuleBase(bot)
 {
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
-        if (eventArgs is MessageCreatedEventArgs mcea)
+        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            return MessageCheck(mcea.Message);
+            return MessageCheck(msgCreatedArgs.Message);
         }
-        else if (eventArgs is MessageUpdatedEventArgs muea)
+        else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            return MessageCheck(muea.Message);
+            return MessageCheck(msgUpdatedArgs.Message);
         }
 
         return false;
     }
 
-    protected bool MessageCheck(DiscordMessage msg)
+    private bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
             return false;
-        
         if (msg.Timestamp.AddDays(1) < DateTime.Now)
             return false; // message is old enough to probably not be relevant
-
-        if (!Config.values.channelsWhereMessagesMustConformToFormat.Contains(msg.ChannelId))
+        if (!Config.values.channelsWhereNicknameMustFollowFormat.Contains(msg.ChannelId))
             return false;
-
-        if (string.IsNullOrWhiteSpace(Formatter.Strip(msg.Content)))
+        if (Config.values.nicknameFormatInQuestion.Length == 0
+            || Config.values.nicknameFormatInQuestion.All(string.IsNullOrWhiteSpace))
+        {
+            Logger.Warn($"Message sent in a nickname-enforced channel ({msg.Channel}), but the format is blank ([{string.Join(", ", Config.values.nicknameFormatInQuestion)}])");
             return false;
+        }
 
-        if (Quoter.Link.Replace(msg.Content, "") == "")
+        if (msg.Author is not DiscordMember member)
+        {
+            Logger.Warn($"Message sent in a nickname-enforced channel ({msg.Channel}), but the author wasn't sent as a DiscordMember!");
+
             return false;
+        }
+        
+        
         Regex symbols = SymbolRegex();
 
-        string cleanContent = symbols.Replace(msg.Content, "");
+
+        string cleanNickname = symbols.Replace(member.DisplayName, "");
 
         int lastIdx = 0;
         foreach (string formatPart in Config.values.theFormatInQuestion)
         {
             var part = symbols.Replace(formatPart, "");
-            int fmtIdx = cleanContent.IndexOf(part, lastIdx, StringComparison.InvariantCultureIgnoreCase);
+            int fmtIdx = cleanNickname.IndexOf(part, lastIdx, StringComparison.InvariantCultureIgnoreCase);
             if (fmtIdx == -1)
             {
                 string fullFormat = string.Join(" [...] ", Config.values.theFormatInQuestion);
@@ -64,7 +72,8 @@ internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
 
         return false;
     }
-
+    
+    
     [GeneratedRegex(@"["",.']")]
     private static partial Regex SymbolRegex();
 }
