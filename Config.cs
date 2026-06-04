@@ -146,7 +146,9 @@ internal class Config
     public ulong[] channelsWhereMessagesMustBeOriginal = [];
     public bool isOriginalityInDryRun = true;
     [TomlInlineComment("Roughly corresponds to characters of difference.")]
-    public int originalityLevDist = 4;
+    public int originalityMinLevDist = 4;
+    [TomlInlineComment("Mul's length by this, to make longer messages require greater originality.")]
+    public double originalityLevDistScale = 0.2;
     
     static Config()
     {

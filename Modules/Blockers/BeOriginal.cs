@@ -70,9 +70,10 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         
         cleanContent = Quoter.UserMention.Replace(cleanContent, "<mention>");
         cleanContent = Whitespace.Replace(cleanContent, " ");
-        
-        int minLevDist = Config.values.isOriginalityInDryRun ? NumberEmojis.Length : (Config.values.originalityLevDist +
-            1);
+
+        int requiredLevDist = Config.values.originalityMinLevDist +
+                              (int)(Config.values.originalityLevDistScale * cleanContent.Length);
+        int minSeenLevDist = Config.values.isOriginalityInDryRun ? 1024 : (requiredLevDist + 1);
         string minLevDistStr = "<None>";
         int levDistCalcs = 0;
         
@@ -85,15 +86,15 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
             
             // The lev dist isn't going to be lowered by a string with a difference in length greater
             // than the currently found smallest lev dist
-            if (Math.Abs(kvp.Value.Length - cleanContent.Length) > minLevDist)
+            if (Math.Abs(kvp.Value.Length - cleanContent.Length) > minSeenLevDist)
                 continue;
             
             int newLevDist = cleanContent.LevenshteinDistance(kvp.Value);
             levDistCalcs++;
             
-            if (newLevDist < minLevDist)
+            if (newLevDist < minSeenLevDist)
             {
-                minLevDist = newLevDist;
+                minSeenLevDist = newLevDist;
                 minLevDistStr = kvp.Value;
             }
         }
@@ -102,7 +103,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         levDistCounts += levDistCalcs;
         elapsedTime += sw.Elapsed;
         processedMessages++;
-        Logger.Put($"Found lev dist {minLevDist} between string [[{cleanContent}]] (message) " +
+        Logger.Put($"Found lev dist {minSeenLevDist} between string [[{cleanContent}]] (message) " +
                    $"and [[{minLevDistStr}]] (historical, of {msgDict.Count} past strings) " +
                    $"in {sw.ElapsedMilliseconds}ms ({levDistCalcs} ld calculations)", LogType.Debug);
 
@@ -113,14 +114,14 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         if (Config.values.isOriginalityInDryRun)
         {
             // num exists in NumberEmojis array & a comparison was made
-            if (minLevDist < NumberEmojis.Length && levDistCounts != 0)
+            if (minSeenLevDist < NumberEmojis.Length && levDistCounts != 0)
             {
-                _ = TryReact(msg, NumberEmojis[minLevDist]);
+                _ = TryReact(msg, NumberEmojis[minSeenLevDist]);
             }
         }
         
         // There are more differences than the allowed amount
-        if (minLevDist < Config.values.originalityLevDist)
+        if (minSeenLevDist < requiredLevDist)
         {
             if (Config.values.isOriginalityInDryRun)
             {
@@ -129,7 +130,8 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
             }
             else
             {
-                TryDeleteDontCare(msg, $"Lev dist of {minLevDist} is greater than the allowed {Config.values.originalityLevDist}.");
+                TryDeleteDontCare(msg, $"Lev dist of {minSeenLevDist} is lesser than the allowed {requiredLevDist} " +
+                                       $"({Config.values.originalityMinLevDist} min + ({Config.values.originalityLevDistScale} scale * {cleanContent.Length} content len) ).");
             }
             
             return true;
@@ -156,13 +158,15 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
     [Command("setLevDist")]
     [RequirePermissions([], [DiscordPermission.ManageMessages])]
     [RequireApplicationOwner]
-    public static async Task SetLevDist(SlashCommandContext ctx, int newValue)
+    public static async Task SetLevDist(SlashCommandContext ctx, int newValue = 4, double scale = 0.2)
     {
-        int oldValue = Config.values.originalityLevDist;
-        Config.values.originalityLevDist = newValue;
-        await ctx.RespondAsync($"Got it, messages are now considered reused if a lev dist of {newValue}\n" +
-                               $"(read: appx {newValue} characters get changed between the two)\n" +
-                               $"(value was formerly {oldValue})", true);
+        int oldMin = Config.values.originalityMinLevDist;
+        double oldScale = Config.values.originalityLevDistScale;
+        Config.values.originalityMinLevDist = newValue;
+        Config.values.originalityLevDistScale = scale;
+        await ctx.RespondAsync($"Got it, messages are now considered reused if a lev dist of {newValue}+(length * {scale}) is found.\n" +
+                               $"(read: appx that # of characters must get changed the new msg and an older one)\n" +
+                               $"(value was formerly {oldMin}, w scale of {oldScale})", true);
         Config.WriteConfig();
     }
     
