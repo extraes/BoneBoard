@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 // ReSharper disable once CheckNamespace
@@ -48,7 +51,7 @@ public record class RelaunchParameters
 
     public static ulong? GetInitiatorId(string[] args)
     {
-        if (!args.Contains(RELAUNCHED_ARG))
+        if (!Enumerable.Contains(args, RELAUNCHED_ARG))
             return null;
         
         string? initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional

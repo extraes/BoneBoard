@@ -1,1 +1,12 @@
 global using BoneBoard;
+global using System.IO;
+global using DSharpPlus;
+global using DSharpPlus.Entities;
+global using DSharpPlus.EventArgs;
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using System.Threading;
+global using System.Net;
+global using System.Net.Http;

@@ -2,6 +2,7 @@
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using System.ComponentModel;
+using System.Net.Http;
 using System.Text;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;

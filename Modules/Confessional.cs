@@ -142,7 +142,7 @@ internal class Confessional : ModuleBase
         }
     }
 
-    internal async Task SendAiConfessional()
+    internal async Task SendAiConfessional(string? userPrompt = null)
     {
         if (ConfessionalChannel is null)
             return;
@@ -158,19 +158,32 @@ internal class Confessional : ModuleBase
             return;
         }
 
-
         var openAiClient = bot.OpenAI.Value;
         if (openAiClient is null)
+        {
+            Logger.Warn("Can't make an AI confession if there's no OpenAI client!");
             return;
+        }
 
         string mainModel = Config.values.openAiConfessionalModel;
         string mainSysPrompt = Config.values.openAiConfessionalSystemPrompt;
-        string mainUserPrompt = Config.values.openAiConfessionalPrompt;
+        string mainUserPrompt = userPrompt ?? Config.values.openAiConfessionalPrompt;
         string sanityModel = Config.values.openAiSanityModel;
         string sanitySysPrompt = Config.values.openAiConfessionalSanityPrompt;
         string sanityUserPrompt = Config.values.openAiConfessionalSanityPrompt;
-        if (string.IsNullOrEmpty(mainModel) || string.IsNullOrEmpty(mainSysPrompt) || string.IsNullOrEmpty(mainUserPrompt) || string.IsNullOrEmpty(sanityModel) || string.IsNullOrEmpty(sanitySysPrompt) || string.IsNullOrEmpty(sanityUserPrompt))
+        if (string.IsNullOrEmpty(mainModel) || string.IsNullOrEmpty(mainSysPrompt) ||
+            string.IsNullOrEmpty(mainUserPrompt) || string.IsNullOrEmpty(sanityModel) ||
+            string.IsNullOrEmpty(sanitySysPrompt) || string.IsNullOrEmpty(sanityUserPrompt))
+        {
+            Logger.Warn($"Can't make an AI confession, something was null!\n" +
+                        $"\tmainModel: {mainModel}" +
+                        $"\tmainSysPrompt: {mainSysPrompt}\n" +
+                        $"\tmainUserPrompt: {mainUserPrompt}\n" +
+                        $"\tsanityModel: {sanityModel}\n" +
+                        $"\tsanitySysPrompt: {sanitySysPrompt}\n" +
+                        $"\tsanityUserPrompt: {sanityUserPrompt}");
             return;
+        }
 
         Logger.Put("Now generating an AI confession!");
 
@@ -591,7 +604,10 @@ internal class Confessional : ModuleBase
     [Command("sendAiConfession"), Description("Sends an AI confession.")]
     [RequireGuild]
     [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task TestSendAiConfession(SlashCommandContext ctx)
+    public static async Task TestSendAiConfession(
+        SlashCommandContext ctx,
+        [Description("Use to steer topic. Something like 'Write a confession about...'")]
+        string? prompt = null)
     {
         var confessional = BoneBot.FindModule<Confessional>(ctx.Guild);
         if (confessional is null)
@@ -603,7 +619,7 @@ internal class Confessional : ModuleBase
         Logger.Put($"Prompting AI confession at the request of {ctx.User}.");
         await ctx.DeferResponseAsync(true);
 
-        await confessional.SendAiConfessional();
+        await confessional.SendAiConfessional(prompt);
 
         await ctx.FollowupAsync("Attempted AI confession.");
     }

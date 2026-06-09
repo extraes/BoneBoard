@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus.Commands.ContextChecks;
 using System.ComponentModel;
+using System.Net.Http;
 using SixLabors.ImageSharp.Formats.Gif;
 using StableCube.Media.Gifsicle;
 
