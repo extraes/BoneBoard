@@ -616,7 +616,7 @@ internal class Confessional : ModuleBase
             return;
         }
         
-        Logger.Put($"Prompting AI confession at the request of {ctx.User}.");
+        Logger.Put($"Prompting AI confession at the request of {ctx.User}, with the prompt: {prompt ?? "(the default)"}.");
         await ctx.DeferResponseAsync(true);
 
         await confessional.SendAiConfessional(prompt);
