@@ -94,6 +94,7 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
             
             if (newLevDist < minSeenLevDist)
             {
+                Logger.Put($"Found a new min dist of {newLevDist} between [[{cleanContent}]] and [[{kvp.Value}]]", LogType.Debug);
                 minSeenLevDist = newLevDist;
                 minLevDistStr = kvp.Value;
             }
