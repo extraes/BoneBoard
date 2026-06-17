@@ -45,7 +45,7 @@ internal static partial class Quoter
     private static readonly HttpClient mediaGetter = new();
     private static readonly HttpClient emojiGetter = new();
     private const string CUSTOM_EMOJI_SUBSTITUTE = "🔲"; // White square with black outline emoji
-    private static readonly List<Match> matchedCustomEmojis = new();
+    private static readonly List<Match> matchedCustomEmojis = [];
     private static readonly ConditionalWeakTable<string, Image> emojiImageCache = new();
 
 

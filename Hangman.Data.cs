@@ -9,7 +9,7 @@ namespace BoneBoard;
 internal partial class Hangman
 {
     private static string[] hangmanStates =
-    {
+    [
         """
             +---+
             |   |
@@ -73,6 +73,6 @@ internal partial class Hangman
                 |
         =========
         congrats you guys killed him
-        """,
-    };
+        """
+    ];
 }

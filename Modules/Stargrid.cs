@@ -136,7 +136,7 @@ internal class Stargrid : ModuleBase
         List<DiscordMember> membersThatReacted;
         try
         {
-            membersThatReacted = new();
+            membersThatReacted = [];
             await foreach (DiscordUser user in args.Message.GetReactionsAsync(args.Emoji))
             {
                 //todo: remove this check and rely on internal cache maybe

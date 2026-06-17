@@ -22,17 +22,17 @@ internal class PersistentData
     public ulong lastFrogKing;
     public DateTime lastSwitchTime = DateTime.Now;
 
-    public List<ulong> bufferedChannels = new(); // channel id
+    public List<ulong> bufferedChannels = []; // channel id
     public Dictionary<ulong, ulong> bufferChannelMessages = new(); // channel id -> message id
     public Dictionary<ulong, string> bufferChannelMessageFormats = new(); // channel id -> message format string
     
     public Dictionary<ulong, ulong> imageRoyaleSubmissions = new(); // submitter id -> message id
     public Dictionary<ulong, ulong> videoRoyaleSubmissions = new(); // submitter id -> message id
     
-    public HashSet<string> usedHaikus = new();
+    public HashSet<string> usedHaikus = [];
 
-    public List<string> previousAiConfessions = new();
-    public List<ulong> aiConfessionals = new(); // message id
+    public List<string> previousAiConfessions = [];
+    public List<ulong> aiConfessionals = []; // message id
     public Dictionary<ulong, DateTime> confessionalRevealTime = new(); // message id -> reveal datetime
     
     public string currHangmanWord = "";
@@ -50,9 +50,9 @@ internal class PersistentData
     public Dictionary<ulong, Dictionary<ulong, DateTime>> ignoreReslowingUntil = new(); // channel id -> user id -> expiry time
 
     public string predictionBoardLink = "";
-    public List<Modules.PredictionEvent> predictionEvents = new();
+    public List<Modules.PredictionEvent> predictionEvents = [];
 
-    public List<string> stickiedMessages = new();
+    public List<string> stickiedMessages = [];
     
     public Dictionary<ulong, Dictionary<ulong, DateTime>> channelTimeoutEndTimes = new(); // channel id -> user id -> expiry time
 

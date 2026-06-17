@@ -116,7 +116,7 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
     public async Task SendBufferedMessages()
     {
         DateTime nextTime = DateTime.Now.AddMinutes(Config.values.bufferTimeMinutes);
-        List<FileStream> openedFiles = new();
+        List<FileStream> openedFiles = [];
 
         foreach ((DiscordChannel channel, Queue<DiscordMessage> deletedMessages) in queuedMessages)
         {
@@ -156,7 +156,7 @@ internal partial class MessageBuffer(BoneBot bot) : ModuleBase(bot)
 
                     var builder = new DiscordMessageBuilder()
                         .WithContent(finalContent)
-                        .WithAllowedMentions(Enumerable.Empty<IMention>());
+                        .WithAllowedMentions([]);
 
                     foreach (DiscordAttachment attachment in recreateMessage.Attachments)
                     {

@@ -22,7 +22,7 @@ internal partial class Casino(BoneBot bot) : ModuleBase(bot)
     // bb.bj.{2: followup id}.{3: user id}.{4: dealer hand}.{5: player hand}.{6: wager}.{7: action} (.Split idx's)
 
     string[] slotMachineEmojis = // courtesy of chatgpt
-    {
+    [
         "🍒", // Cherry
         "🍋", // Lemon
         "🍇", // Grapes
@@ -33,7 +33,7 @@ internal partial class Casino(BoneBot bot) : ModuleBase(bot)
         "💰", // Money Bag
         "💎", // Gem
         "🎰"  // Slot Machine
-    };
+    ];
 
     static TimeSpan pointsTimeout = TimeSpan.FromMinutes(15);
     Dictionary<DiscordUser, DateTime> lastTimePointsGotten = new();

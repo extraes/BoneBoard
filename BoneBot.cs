@@ -186,7 +186,7 @@ public class BoneBot
     private Task ThreadCreated(DiscordClient clint, ThreadCreatedEventArgs args)
     {
         if (!allChannels.TryGetValue(args.Guild, out var allChannelsSlice))
-            allChannelsSlice = allChannels[args.Guild] = new HashSet<DiscordChannel>();
+            allChannelsSlice = allChannels[args.Guild] = [];
 
         allChannelsSlice.Add(args.Thread);
         return Task.CompletedTask;
@@ -195,7 +195,7 @@ public class BoneBot
     private Task ChannelCreated(DiscordClient clint, ChannelCreatedEventArgs args)
     {
         if (!allChannels.TryGetValue(args.Guild, out var allChannelsSlice))
-            allChannelsSlice = allChannels[args.Guild] = new HashSet<DiscordChannel>();
+            allChannelsSlice = allChannels[args.Guild] = [];
 
         allChannelsSlice.Add(args.Channel);
         return Task.CompletedTask;
@@ -265,7 +265,7 @@ public class BoneBot
         foreach (var channelKvp in args.Guilds.Values.SelectMany(dg => dg.Channels))
         {
             if (!allChannels.TryGetValue(channelKvp.Value.Guild, out var allChannelsSlice))
-                allChannelsSlice = allChannels[channelKvp.Value.Guild] = new HashSet<DiscordChannel>();
+                allChannelsSlice = allChannels[channelKvp.Value.Guild] = [];
 
             allChannelsSlice.Add(channelKvp.Value);
             if (channelKvp.Value.Type is DiscordChannelType.Text or DiscordChannelType.GuildForum or DiscordChannelType.GuildMedia or DiscordChannelType.News)

@@ -34,7 +34,7 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
     static Timer? sendTimer;
     TimeOnly sendTime;
     DateTime lastSend;
-    DiscordChannel? voteChannel;
+    static DiscordChannel? voteChannel;
     DiscordChannel? outputChannel;
     DiscordEmoji? voteEmoji;
 
@@ -67,7 +67,7 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
 
         try
         {
-            if (Config.values.videoRoyaleVotingChannel != default)
+            if (voteChannel?.Id != Config.values.videoRoyaleVotingChannel)
                 voteChannel = await bot.client.GetChannelAsync(Config.values.videoRoyaleVotingChannel);
             else
                 Logger.Warn("No voting channel set for video royale");
@@ -280,7 +280,7 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        if (royale.voteChannel is null)
+        if (voteChannel is null)
         {
             await ctx.RespondAsync("voting channel not set", true);
             return;
@@ -288,7 +288,7 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
 
         if (PersistentData.values.videoRoyaleSubmissions.TryGetValue(member.Id, out ulong preexistingMsgId))
         {
-            await ctx.RespondAsync($"you already submitted a video, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}/{preexistingMsgId})", true);
+            await ctx.RespondAsync($"you already submitted a video, see it [here](https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}/{preexistingMsgId})", true);
             return;
         }
 
@@ -346,14 +346,14 @@ internal class VideoRoyale(BoneBot bot) : ModuleBase(bot)
 
             Logger.Put($"{member} submitted a file originally named {video.FileName} to video royale");
                 
-            DiscordMessage msg = await royale.voteChannel.SendMessageAsync(dumb);
+            DiscordMessage msg = await voteChannel.SendMessageAsync(dumb);
             PersistentData.values.videoRoyaleSubmissions[member.Id] = msg.Id;
             PersistentData.WritePersistentData();
 
             if (royale.voteEmoji is not null)
                 await BoneBot.TryReact(msg, royale.voteEmoji);
 
-            await ctx.RespondAsync($"submitted video, check https://discord.com/channels/{ctx.Guild.Id}/{royale.voteChannel.Id}", true);
+            await ctx.RespondAsync($"submitted video, check https://discord.com/channels/{ctx.Guild.Id}/{voteChannel.Id}", true);
 
             try
             {

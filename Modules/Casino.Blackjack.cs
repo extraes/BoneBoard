@@ -547,8 +547,8 @@ internal partial class Casino
         var stayButtonGrayed =
             new DiscordButtonComponent(DiscordButtonStyle.Primary, BLACKJACK_NO_OP + ".b", "Stay", true);
 
-        List<Cards.Card> dealerHand = new();
-        List<Cards.Card> playerHand = new();
+        List<Cards.Card> dealerHand = [];
+        List<Cards.Card> playerHand = [];
         string display = GenerateBlackjackString(wager, dealerHand, playerHand, sideBets, new Dictionary<SideBet, double>());
         var builder = new DiscordWebhookBuilder()
             .AddActionRowComponent(hitButtonGrayed, stayButtonGrayed);
@@ -695,11 +695,11 @@ internal partial class Casino
         string buttonIdBase = string.Format(BLACKJACK_INTERACTION_FORMAT, followupId, userId, "{0}", "{1}", wager,
             "{2}", BlackjackUtils.SerializeSideBetString(sideBets));
 
-        List<DiscordComponent> disabledButtons = new()
-        {
+        List<DiscordComponent> disabledButtons =
+        [
             new DiscordButtonComponent(DiscordButtonStyle.Danger, BLACKJACK_NO_OP + ".a", "Hit", true),
-            new DiscordButtonComponent(DiscordButtonStyle.Primary, BLACKJACK_NO_OP + ".b", "Stay", true),
-        };
+            new DiscordButtonComponent(DiscordButtonStyle.Primary, BLACKJACK_NO_OP + ".b", "Stay", true)
+        ];
         DiscordActionRowComponent disabledDarc = new(disabledButtons);
 
         Cards.Deck deck = new();

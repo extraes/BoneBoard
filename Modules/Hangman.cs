@@ -23,27 +23,27 @@ namespace BoneBoard;
 internal partial class Hangman(BoneBot bot) : ModuleBase(bot)
 {
     const string VOWELS = "aeiou";
-    string[] possibleWords = Array.Empty<string>();
+    string[] possibleWords = [];
     DiscordMessage? hangmanMessage;
 
     DiscordEmoji thumbsDownEmoji = DiscordEmoji.FromUnicode("👎");
     DiscordEmoji[] joyEmojis =
-    {
+    [
         DiscordEmoji.FromUnicode("😂"),
-        DiscordEmoji.FromUnicode("😹"),
-    };
+        DiscordEmoji.FromUnicode("😹")
+    ];
     DiscordEmoji[] xEmojis =
-    {
+    [
         DiscordEmoji.FromUnicode("❎"),
         DiscordEmoji.FromUnicode("✖️"),
-        DiscordEmoji.FromUnicode("❌"),
-    };
+        DiscordEmoji.FromUnicode("❌")
+    ];
     DiscordEmoji[] checkEmojis =
-    {
+    [
         DiscordEmoji.FromUnicode("☑️"),
         DiscordEmoji.FromUnicode("✔️"),
-        DiscordEmoji.FromUnicode("✅"),
-    };
+        DiscordEmoji.FromUnicode("✅")
+    ];
 
     //bot.ConfigureEvents(e =>
     //{

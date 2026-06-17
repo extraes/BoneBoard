@@ -150,7 +150,7 @@ internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
     [RequirePermissions([], [DiscordPermission.ManageMessages])]
     public static async Task ClearStickyMessages(SlashCommandContext ctx)
     {
-        List<DiscordMessage> removeMessages = new();
+        List<DiscordMessage> removeMessages = [];
         foreach (var msg in stickyMessages)
         {
             if (msg.ChannelId != ctx.Channel.Id)

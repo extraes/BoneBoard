@@ -44,7 +44,7 @@ public abstract partial class ModuleBase
         }
     }
 
-    internal static readonly List<ModuleBase> AllModules = new();
+    internal static readonly List<ModuleBase> AllModules = [];
     static readonly CircularBuffer<DiscordEventArgs> DontPropagate = new(4096);
     
 

@@ -50,7 +50,7 @@ internal class Confessional : ModuleBase
 
     // todo: propertyize
     Dictionary<DiscordMember, DateTime> confessions = new();
-    List<DiscordMessage> confessionsByAi = new();
+    List<DiscordMessage> confessionsByAi = [];
     static TextWriter? csvConfessional;
     Task? occasionalConfessional;
 
@@ -66,7 +66,7 @@ internal class Confessional : ModuleBase
                 csvConfessional = File.AppendText(Config.values.confessionCsvPath);
                 if (!csvExistedBeforehand)
                 {
-                    CsvWriter.Write(csvConfessional, confessionalCsvHeaders, Enumerable.Empty<string[]>(), ',', false);
+                    CsvWriter.Write(csvConfessional, confessionalCsvHeaders, [], ',', false);
                     csvConfessional.Flush();
                 }
             }
@@ -282,12 +282,12 @@ internal class Confessional : ModuleBase
         }
 
         string[] slurPatterns =
-        {
+        [
             "*fag*",
             "niga",
             "niger",
-            "*nigg*",
-        };
+            "*nigg*"
+        ];
 
         foreach (string pattern in slurPatterns)
         {
@@ -305,7 +305,7 @@ internal class Confessional : ModuleBase
             .WithDescription(text);
 
         var dmb = new DiscordMessageBuilder()
-            .WithAllowedMentions(Enumerable.Empty<IMention>())
+            .WithAllowedMentions([])
             .AddEmbed(deb);
 
         // confessions usually only reference themselves and not outside messages
@@ -324,12 +324,12 @@ internal class Confessional : ModuleBase
         //catch { }
 
         string[] values =
-        {
+        [
             bot.IsMe(member) ? "AI" : "Human",
             DateTime.Now.ToString(),
-            text,
+            text
             //context
-        };
+        ];
 
         try
         {

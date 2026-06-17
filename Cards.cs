@@ -9,7 +9,7 @@ internal static class Cards
 
     internal static bool TryParse(string handStr, out List<Card> hand)
     {
-        hand = new();
+        hand = [];
         if (handStr.Length % 2 != 0)
             return false;
 
@@ -151,8 +151,8 @@ internal static class Cards
 
     public class Deck
     {
-        private readonly List<Card> cards = new();
-        private readonly List<Card> discarded = new();
+        private readonly List<Card> cards = [];
+        private readonly List<Card> discarded = [];
 
         public Deck()
         {
