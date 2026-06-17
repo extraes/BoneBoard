@@ -31,7 +31,7 @@ internal class Confessional : ModuleBase
     const string REWRITE_SENDORIGINAL = "o";
 
 
-    Dictionary<ulong, RewriteInfo> rewriteInfos = new();
+    static readonly Dictionary<ulong, RewriteInfo> RewriteInfos = new();
 
     private static TimeSpan RewriteCooldown => TimeSpan.FromSeconds(10);
     DiscordChannel? _confessionalChannel;
@@ -96,8 +96,8 @@ internal class Confessional : ModuleBase
     {
         try
         {
-            if (occasionalConfessional is not null)
-                occasionalConfessional = OccasionalAiConfessional();
+            if (occasionalConfessional is null || occasionalConfessional.IsFaulted)
+                occasionalConfessional = Task.Run(OccasionalAiConfessional);
         }
         catch (Exception ex)
         {
@@ -125,20 +125,14 @@ internal class Confessional : ModuleBase
     {
         while (true)
         {
-            try
-            {
-                int dist = Config.values.confessionalCooldownHoursMax - Config.values.confessionalCooldownHoursMin;
-                double hours = Config.values.confessionalCooldownHoursMin + dist * Random.Shared.NextDouble();
-                TimeSpan wait = TimeSpan.FromHours(hours);
-                await Task.Delay(wait);
+            int dist = Config.values.confessionalCooldownHoursMax - Config.values.confessionalCooldownHoursMin;
+            double hours = Config.values.confessionalCooldownHoursMin + dist * Random.Shared.NextDouble();
+            TimeSpan wait = TimeSpan.FromHours(hours);
+            Logger.Put($"Waiting {wait:g} to send an AI confessional", LogType.Debug);
+            await Task.Delay(wait);
 
-                Logger.Put("Time for an AI confession!");
-                await SendAiConfessional();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Exception in occasional AI confessional! " + ex);
-            }
+            Logger.Put("Time for an AI confession!");
+            await SendAiConfessional();
         }
     }
 
@@ -519,7 +513,7 @@ internal class Confessional : ModuleBase
     private async Task RewriteConfession(SlashCommandContext ctx, string confessionToRewrite)
     {
         ChatClient clint = bot.OpenAI.Value!.GetChatClient(Config.values.openAiConfessionRewriteModel);
-        rewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, "I'm impatient and can't wait for an LLM to crunch its numbers!", DateTime.Now, DateTime.Now + TimeSpan.FromDays(1));
+        RewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, "I'm impatient and can't wait for an LLM to crunch its numbers!", DateTime.Now, DateTime.Now + TimeSpan.FromDays(1));
 
         string rewritten;
         try
@@ -539,7 +533,7 @@ internal class Confessional : ModuleBase
         }
 
         DateTime nextRewriteAllowedAt = DateTime.Now + RewriteCooldown + TimeSpan.FromMilliseconds(confessionToRewrite.Length * 2 + rewritten.Length * 4);
-        rewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, rewritten, DateTime.Now, nextRewriteAllowedAt);
+        RewriteInfos[ctx.Interaction.Id] = new(ctx, confessionToRewrite, rewritten, DateTime.Now, nextRewriteAllowedAt);
 
         DiscordButtonComponent accept = new(DiscordButtonStyle.Primary, string.Format(REWRITE_INTERACTION_FORMAT, ctx.Interaction.Id, REWRITE_ACCEPT), "Accept");
         DiscordButtonComponent tryagain = new(DiscordButtonStyle.Secondary, string.Format(REWRITE_INTERACTION_FORMAT, ctx.Interaction.Id, REWRITE_TRYAGAIN), "Rewrite again");
@@ -563,7 +557,7 @@ internal class Confessional : ModuleBase
             return;
         }
 
-        if (!rewriteInfos.TryGetValue(originInteractionId, out RewriteInfo? info))
+        if (!RewriteInfos.TryGetValue(originInteractionId, out RewriteInfo? info))
         {
             await interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource, res.WithContent($"Unable to find `{splits[2]}` in the interaction info dictionary."));
             return;
