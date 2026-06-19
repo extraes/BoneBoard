@@ -149,7 +149,11 @@ internal class Config
     public int originalityMinLevDist = 4;
     [TomlInlineComment("Mul's length by this, to make longer messages require greater originality.")]
     public double originalityLevDistScale = 0.2;
-    
+    public bool sendObituaryWhenDeletingUnoriginalMessage = true;
+    public float unoriginalObituaryCooldownHrs = 2;
+
+    public string pictureFramePngPath = "./Assets/pictureframe.png";
+
     static Config()
     {
         Console.WriteLine("Initializing config");

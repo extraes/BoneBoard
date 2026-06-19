@@ -5,6 +5,8 @@ using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
 
 namespace BoneBoard.Modules.Blockers;
 
@@ -133,6 +135,8 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
             {
                 TryDeleteDontCare(msg, $"Lev dist of {minSeenLevDist} is lesser than the allowed {requiredLevDist} " +
                                        $"({Config.values.originalityMinLevDist} min + ({Config.values.originalityLevDistScale} scale * {cleanContent.Length} content len) ).");
+
+                ProcObituaryFor(msg);
             }
             
             return true;
@@ -140,6 +144,44 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         
         
         return false;
+    }
+
+    private void ProcObituaryFor(DiscordMessage msg)
+    {
+        if (!Config.values.sendObituaryWhenDeletingUnoriginalMessage || msg.Author is null)
+            return;
+
+        if (!PersistentData.values.lastUnoriginalObituaryTimes.TryGetValue(msg.ChannelId, out var userDict))
+        {
+            userDict = [];
+            PersistentData.values.lastUnoriginalObituaryTimes[msg.ChannelId] = userDict;
+        }
+        
+        if (userDict.TryGetValue(msg.Author.Id, out var lastObituaryTime) // has had an obituary before
+            && DateTime.Now - lastObituaryTime < TimeSpan.FromHours(Config.values.unoriginalObituaryCooldownHrs)) // time between last obit and now is less than the set num of hours 
+        {
+            Logger.Put($"Not sending obituary for {msg.Author} - they got one {(DateTime.Now - lastObituaryTime).TotalHours:0.0} hrs ago", LogType.Debug);
+            return;
+        }
+        
+        Task.Run(async () =>
+        {
+            if (msg.Channel is null)
+                return;
+            var img = await Quoter.Obituary(msg, bot.client);
+            if (img is null)
+                return;
+
+            using var ms = new MemoryStream();
+            await img.SaveAsJpegAsync(ms, new JpegEncoder { Quality = 90 });
+            ms.Seek(0, SeekOrigin.Begin); // reset stream pos
+
+            var dmb = new DiscordMessageBuilder()
+                .AddFile("rip.png", ms, AddFileOptions.CopyStream);
+            Logger.Put($"Sending obituary message for msg {msg}", LogType.Debug);
+            await msg.Channel.SendMessageAsync(dmb);
+        });
+        
     }
 
     [GeneratedRegex(@"[\s_-]+", RegexOptions.Compiled)]

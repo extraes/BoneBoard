@@ -41,13 +41,59 @@ internal static partial class Quoter
     [GeneratedRegex(@"<a?:([\w0-9]+):([0-9]+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
     private static partial Regex BakedRegex_CustomEmoji();
 
-    private static readonly HttpClient pfpGetter = new();
-    private static readonly HttpClient mediaGetter = new();
-    private static readonly HttpClient emojiGetter = new();
+    private static readonly HttpClient PfpGetter = new();
+    private static readonly HttpClient MediaGetter = new();
+    private static readonly HttpClient EmojiGetter = new();
     private const string CUSTOM_EMOJI_SUBSTITUTE = "🔲"; // White square with black outline emoji
-    private static readonly List<Match> matchedCustomEmojis = [];
-    private static readonly ConditionalWeakTable<string, Image> emojiImageCache = new();
+    private static readonly List<Match> MatchedCustomEmojis = [];
+    private static readonly ConditionalWeakTable<string, Image> EmojiImageCache = new();
 
+    private static readonly Configured<Image?> PictureFrame = new(() =>
+    {
+        try
+        {
+            var path = Path.GetFullPath(Config.values.pictureFramePngPath);
+            Logger.Put("Loading picture frame from " + path, LogType.Debug);
+            return Image.Load(path);
+        }
+        catch
+        {
+            return null;
+        }
+    }, () => Config.values.pictureFramePngPath); 
+
+    public static async Task<Image?> Obituary(DiscordMessage msg, DiscordClient clint)
+    {
+        if (msg.Author is not DiscordMember member)
+        {
+            Logger.Warn($"Not going to create an obituary for a message sent by someone who isn't a member: {msg.Author}");
+            return null;
+        }
+        string name = member.DisplayName;
+        string cleanedContent = QuickCleanContent(msg, clint, msg.Channel?.Guild);
+
+        const int PFP_IMAGE_SIZE = 512;
+
+        var pfpUrl = member.GetGuildAvatarUrl(MediaFormat.Png, PFP_IMAGE_SIZE);
+        await using Stream stream = await PfpGetter.GetStreamAsync(pfpUrl);
+        using Image pfpImg = await Image.LoadAsync(stream);
+        
+        pfpImg.Mutate(x => x.ColorBlindness(ColorBlindnessMode.Achromatopsia));
+        if (PictureFrame.Value is not null)
+        {
+            using var frame = PictureFrame.Value.Clone(x => x.Resize(new ResizeOptions() { Size = new Size(PFP_IMAGE_SIZE, PFP_IMAGE_SIZE), Mode = ResizeMode.Stretch }));
+            // ReSharper disable once AccessToDisposedClosure
+            pfpImg.Mutate(x => x.DrawImage(frame, 1));
+        }
+        else
+            Logger.Warn($"Picture frame was null! Continuing without!");
+        
+        string footer = $"A true bastion of unoriginality since {member.CreationTimestamp.Year}";
+        if (string.IsNullOrWhiteSpace(cleanedContent))
+            footer = $"A true bastion of unoriginal stoicism since {member.CreationTimestamp.Year}";
+        
+        return QuotifyFrame(pfpImg, name, cleanedContent, msg.CreationTimestamp.Year, footer, width: 960, height: 400, pfpSize: 400);
+    }
 
     public static async Task<Image?> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)
     {
@@ -143,7 +189,7 @@ internal static partial class Quoter
         //}
         
 
-        using Stream stream = await pfpGetter.GetStreamAsync(pfpUrl);
+        using Stream stream = await PfpGetter.GetStreamAsync(pfpUrl);
         using Image img = await Image.LoadAsync(stream);
         Image? media = null;
         if (mediaThumb is not null || mediaThumb?.Length < 5)
@@ -155,7 +201,7 @@ internal static partial class Quoter
                 if (cleanContent == "<Link>")
                     cleanContent = "";
 
-                using Stream mediaStream = await mediaGetter.GetStreamAsync(mediaThumb);
+                using Stream mediaStream = await MediaGetter.GetStreamAsync(mediaThumb);
                 media = await Image.LoadAsync(mediaStream);
             }
             catch (Exception ex)
@@ -165,7 +211,7 @@ internal static partial class Quoter
             }
         }
 
-        List<Match> customEmojis = matchedCustomEmojis;
+        List<Match> customEmojis = MatchedCustomEmojis;
         customEmojis.Clear();
         MatchEvaluator emojiMentionEvaluator = match => { customEmojis.Add(match); return CUSTOM_EMOJI_SUBSTITUTE; };
         cleanContent = CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
@@ -258,7 +304,7 @@ internal static partial class Quoter
         {
             var id = emojiMatch.Groups[2].Value;
             
-            if (emojiImageCache.TryGetValue(id, out var img))
+            if (EmojiImageCache.TryGetValue(id, out var img))
             {
                 images.Add(img);
                 continue;
@@ -267,9 +313,9 @@ internal static partial class Quoter
             string url = $"https://cdn.discordapp.com/emojis/{id}.png?size=320&quality=lossless";
             try
             {
-                using Stream stream = await emojiGetter.GetStreamAsync(url);
+                using Stream stream = await EmojiGetter.GetStreamAsync(url);
                 Image<Rgba32> emoji = await Image.LoadAsync<Rgba32>(stream);
-                emojiImageCache.Add(id, emoji);
+                EmojiImageCache.Add(id, emoji);
                 images.Add(emoji);
             }
             catch (Exception ex)
@@ -396,7 +442,7 @@ internal static partial class Quoter
     }
 
     public delegate void GlyphReplacer((Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) quoteImages, ReadOnlySpan<GlyphBounds> allGlyphs, FontRectangle textblockBounds, int lineCount);
-
+    
     public static Image Quotify(Image pfp, string name, string quote, int year, string extraText, Image? media = null,
         int width = 1280, int height = 720, int pfpSize = 512, GlyphReplacer? glyphReplacer = null)
     {
@@ -476,6 +522,7 @@ internal static partial class Quoter
         float marginY = height * 0.25f, marginX = 50, bottomToPfpMargin = (height - pfpSize) / 2f;
         const float NAME_FONT_SIZE = 36;
 
+        float scaleFactor = MathF.Min(height, height) / 720; // so things can scale down as the image gets smaller
         Image<Rgba32> quoteBaseplate = new(width, height);
         var config = quoteBaseplate.Configuration;
         GraphicsOptions opt = new();
@@ -573,8 +620,8 @@ internal static partial class Quoter
         // don't draw the quote if there was no text content in the first place
         if (quote.Length != 2)
         {
-            float quoteSize = 512 / MathF.Sqrt(quote.Length);
-            float quoteSizeSmaller = 384 / MathF.Sqrt(quote.Length);
+            float quoteSize = 512 / MathF.Sqrt(quote.Length) * scaleFactor;
+            float quoteSizeSmaller = 384 / MathF.Sqrt(quote.Length) * scaleFactor;
             Font quoteFont = ff.CreateFont(quoteSize, FontStyle.Bold);
             Font quoteFontSmaller = ff.CreateFont(quoteSizeSmaller, FontStyle.Bold);
             float textWidth = (width - pfpSize);
@@ -622,7 +669,7 @@ internal static partial class Quoter
 
         if (!string.IsNullOrWhiteSpace(extraText))
         {
-            Font extraTextFont = ff.CreateFont(24, FontStyle.Italic);
+            Font extraTextFont = ff.CreateFont(24 * scaleFactor, FontStyle.Italic);
             RichTextOptions extraOpt = new(extraTextFont)
             {
                 Origin = new(marginX, height - 0.5f * marginY),

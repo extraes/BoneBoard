@@ -37,5 +37,11 @@
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
     <PackageReference Include="StableCube.Media.Gifsicle" Version="8.0.7" />
   </ItemGroup>
+  <ItemGroup>
+    <None Remove="Assets\pictureframe.png" />
+    <Content Include="Assets\pictureframe.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
 </Project>

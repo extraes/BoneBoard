@@ -57,6 +57,8 @@ internal class PersistentData
     public Dictionary<ulong, Dictionary<ulong, DateTime>> channelTimeoutEndTimes = new(); // channel id -> user id -> expiry time
 
     public Dictionary<ulong, Dictionary<ulong, string>> uniqueChannelsMessages = new(); // channel id -> msg id -> cleaned content
+
+    public Dictionary<ulong, Dictionary<ulong, DateTime>> lastUnoriginalObituaryTimes = new(); // channel id -> user id -> last time an obituary was made for someone
     
     static PersistentData()
     {
