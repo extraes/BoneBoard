@@ -55,7 +55,7 @@ internal partial class NicknameEnforcer(BoneBot bot) : ModuleBase(bot)
         string cleanNickname = symbols.Replace(member.DisplayName, "");
 
         int lastIdx = 0;
-        foreach (string formatPart in Config.values.theFormatInQuestion)
+        foreach (string formatPart in Config.values.nicknameFormatInQuestion)
         {
             var part = symbols.Replace(formatPart, "");
             int fmtIdx = cleanNickname.IndexOf(part, lastIdx, StringComparison.InvariantCultureIgnoreCase);
