@@ -168,7 +168,12 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
         {
             if (msg.Channel is null)
                 return;
-            var img = await Quoter.Obituary(msg, bot.client);
+
+            string footer = $"A bastion of unoriginality since {msg.Author.CreationTimestamp.Year}";
+            if (Quoter.Link.Replace(msg.Content, "").Length == 0)
+                footer = $"A bastion of unoriginal stoicism since {msg.Author.CreationTimestamp.Year}";
+            
+            var img = await Quoter.Obituary(msg, bot.client, overrideFooter: footer);
             if (img is null)
                 return;
 
@@ -179,7 +184,13 @@ public partial class BeOriginal(BoneBot bot) : ModuleBase(bot)
             var dmb = new DiscordMessageBuilder()
                 .AddFile("rip.png", ms, AddFileOptions.CopyStream);
             Logger.Put($"Sending obituary message for msg {msg}", LogType.Debug);
-            await msg.Channel.SendMessageAsync(dmb);
+            var obituaryMessage = await msg.Channel.SendMessageAsync(dmb);
+
+            if (Config.values.unoriginalObituaryDeleteTimeMinutes != 0)
+            {
+                _ = Task.Delay(TimeSpan.FromMinutes(Config.values.unoriginalObituaryDeleteTimeMinutes))
+                    .ContinueWith((_) => TryDeleteDontCare(obituaryMessage));
+            }
         });
         
     }

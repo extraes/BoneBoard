@@ -151,6 +151,8 @@ internal class Config
     public double originalityLevDistScale = 0.2;
     public bool sendObituaryWhenDeletingUnoriginalMessage = true;
     public float unoriginalObituaryCooldownHrs = 2;
+    [TomlInlineComment("Set to 0 to disable")]
+    public float unoriginalObituaryDeleteTimeMinutes = 1;
 
     public string pictureFramePngPath = "./Assets/pictureframe.png";
 

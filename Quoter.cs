@@ -62,7 +62,7 @@ internal static partial class Quoter
         }
     }, () => Config.values.pictureFramePngPath); 
 
-    public static async Task<Image?> Obituary(DiscordMessage msg, DiscordClient clint)
+    public static async Task<Image?> Obituary(DiscordMessage msg, DiscordClient clint, string? overrideFooter = null, string? overrideQuote = null)
     {
         if (msg.Author is not DiscordMember member)
         {
@@ -70,7 +70,7 @@ internal static partial class Quoter
             return null;
         }
         string name = member.DisplayName;
-        string cleanedContent = QuickCleanContent(msg, clint, msg.Channel?.Guild);
+        string quoteText = overrideQuote ?? QuickCleanContent(msg, clint, msg.Channel?.Guild);
 
         const int PFP_IMAGE_SIZE = 512;
 
@@ -78,7 +78,7 @@ internal static partial class Quoter
         await using Stream stream = await PfpGetter.GetStreamAsync(pfpUrl);
         using Image pfpImg = await Image.LoadAsync(stream);
         
-        pfpImg.Mutate(x => x.ColorBlindness(ColorBlindnessMode.Achromatopsia));
+        pfpImg.Mutate(x => x.ColorBlindness(ColorBlindnessMode.Achromatopsia).Resize(new ResizeOptions() { Size = new Size(PFP_IMAGE_SIZE, PFP_IMAGE_SIZE), Mode = ResizeMode.Pad }));
         if (PictureFrame.Value is not null)
         {
             using var frame = PictureFrame.Value.Clone(x => x.Resize(new ResizeOptions() { Size = new Size(PFP_IMAGE_SIZE, PFP_IMAGE_SIZE), Mode = ResizeMode.Stretch }));
@@ -87,12 +87,9 @@ internal static partial class Quoter
         }
         else
             Logger.Warn($"Picture frame was null! Continuing without!");
-        
-        string footer = $"A true bastion of unoriginality since {member.CreationTimestamp.Year}";
-        if (string.IsNullOrWhiteSpace(cleanedContent))
-            footer = $"A true bastion of unoriginal stoicism since {member.CreationTimestamp.Year}";
-        
-        return QuotifyFrame(pfpImg, name, cleanedContent, msg.CreationTimestamp.Year, footer, width: 960, height: 400, pfpSize: 400);
+
+        string footer = overrideFooter ?? $"A member since {member.JoinedAt.Year}";
+        return QuotifyFrame(pfpImg, name, quoteText, msg.CreationTimestamp.Year, footer, width: 960, height: 400, pfpSize: 400);
     }
 
     public static async Task<Image?> GenerateImageFrom(DiscordMessage msg, DiscordClient clint)

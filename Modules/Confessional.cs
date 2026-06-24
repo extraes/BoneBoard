@@ -185,7 +185,6 @@ internal class Confessional : ModuleBase
         var sanityClient = openAiClient.GetChatClient(Config.values.openAiSanityModel);
         ChatCompletionOptions mainOptions = new()
         {
-            MaxOutputTokenCount = 256,
             Temperature = 0.5f,
         };
 
