@@ -277,13 +277,13 @@ namespace BoneBoard
                     continue;
 
                 var newStr = Formatter.Sanitize(nextStr);
-                if (sb.Length + newStr.Length > 2000)
+                if (sb.Length + newStr.Length >= 2000)
                     break;
                 sb.AppendLine(newStr);
             }
 
-            var str = sb.Length == 0 ? "-# ermmmm 🦗🦗🦗" : sb.ToString();
-            await ctx.RespondAsync(str, true);
+            var finalResponse = sb.Length == 0 ? "-# ermmmm 🦗🦗🦗" : sb.ToString();
+            await ctx.RespondAsync(finalResponse, true);
         }
     }
 }
