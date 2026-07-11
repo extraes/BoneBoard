@@ -249,9 +249,14 @@ internal class Confessional : ModuleBase
     {
         static string RandomString(int length)
         {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789qwertyuiopasdfghjklzxcvbnm";
-            return new string(Enumerable.Repeat(chars, length)
-                .Select(s => s[Random.Shared.Next(s.Length)]).ToArray());
+            // ReSharper disable once StringLiteralTypo
+            const string CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789qwertyuiopasdfghjklzxcvbnm";
+            StringBuilder sb = new(length);
+            for (int i = 0; i < length; i++)
+            {
+                sb.Append(CHARS[Random.Shared.Next(CHARS.Length)]);
+            }
+            return sb.ToString();
         }
 
         if (ConfessionalChannel is null)
@@ -328,8 +333,8 @@ internal class Confessional : ModuleBase
         {
             if (csvConfessional is not null)
             {
-                CsvWriter.Write(csvConfessional, confessionalCsvHeaders, [values], skipHeaderRow: true);
-                csvConfessional.Flush();
+                await CsvWriter.WriteAsync(csvConfessional, confessionalCsvHeaders, [values], skipHeaderRow: true);
+                await csvConfessional.FlushAsync();
             }
         }
         catch (Exception ex)
@@ -337,7 +342,7 @@ internal class Confessional : ModuleBase
             Logger.Error("Failed to write to confessional CSV! ", ex);
         }
 
-        byte[] textBytes = Encoding.UTF8.GetBytes($"{RandomString(Random.Shared.Next(8))} {member.Username} - id {member.Id} {RandomString(Random.Shared.Next(8))}");
+        byte[] textBytes = Encoding.UTF8.GetBytes($"{RandomString(Random.Shared.Next(1, 8))} {member.Username} - id {member.Id} {RandomString(Random.Shared.Next(1, 8))}");
         string authorString = Convert.ToBase64String(textBytes);
         try
         {
