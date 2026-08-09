@@ -105,7 +105,8 @@ internal class PersistentData
         write = Timer.Elapsed;
         
         PersistentDataChanged?.Invoke();
-        Logger.Put($"Wrote persistent data to disk in {(serialize + write).Seconds:0.00}s " +
+        // yes i know chars are 2 bytes. UTF-8 is 1 byte tho. so i think its fine. 
+        Logger.Put($"Wrote {serializedString.Length / 1024.0:0.0}KB of persistent data to disk in {(serialize + write).Seconds:0.00}s " +
                    $"({(int)serialize.TotalMilliseconds}ms serializing, " +
                    $"{(int)write.TotalMilliseconds}ms writing)");
     }
