@@ -1,56 +1,55 @@
-﻿using System.Reflection;
-
-namespace BoneBoard;
-
-public static class SafeActions
+﻿namespace BoneBoard
 {
-    public static void InvokeActionSafe(this Action action)
+    public static class SafeActions
     {
-        if (action == null) return;
-        foreach (Delegate invoker in action.GetInvocationList())
+        public static void InvokeActionSafe(this Action action)
         {
-            try
+            if (action == null) return;
+            foreach (var invoker in action.GetInvocationList())
             {
-                Action call = (Action)invoker;
-                call();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Exception while invoking hook callback!", ex);
+                try
+                {
+                    var call = (Action)invoker;
+                    call();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Exception while invoking hook callback!", ex);
+                }
             }
         }
-    }
 
-    public static void InvokeActionSafe<T>(this Action<T> action, T param)
-    {
-        if (action == null) return;
-        foreach (Delegate invoker in action.GetInvocationList())
+        public static void InvokeActionSafe<T>(this Action<T> action, T param)
         {
-            try
+            if (action == null) return;
+            foreach (var invoker in action.GetInvocationList())
             {
-                Action<T> call = (Action<T>)invoker;
-                call(param);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Exception while invoking hook callback!", ex);
+                try
+                {
+                    var call = (Action<T>)invoker;
+                    call(param);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Exception while invoking hook callback!", ex);
+                }
             }
         }
-    }
 
-    public static void InvokeActionSafe<T1, T2>(this Action<T1, T2> action, T1 param1, T2 param2)
-    {
-        if (action == null) return;
-        foreach (Delegate invoker in action.GetInvocationList())
+        public static void InvokeActionSafe<T1, T2>(this Action<T1, T2> action, T1 param1, T2 param2)
         {
-            try
+            if (action == null) return;
+            foreach (var invoker in action.GetInvocationList())
             {
-                Action<T1, T2> call = (Action<T1, T2>)invoker;
-                call(param1, param2);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Exception while invoking hook callback!", ex);
+                try
+                {
+                    var call = (Action<T1, T2>)invoker;
+                    call(param1, param2);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Exception while invoking hook callback!", ex);
+                }
             }
         }
     }

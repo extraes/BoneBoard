@@ -1,119 +1,117 @@
-﻿using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 
-namespace BoneBoard.Modules.Blockers;
-
-internal partial class WordPercentage(BoneBot bot) : ModuleBase(bot)
+namespace BoneBoard.Modules.Blockers
 {
-    private static readonly Regex Whitespace = WhitespaceRegex();
-    internal static readonly Regex Link = LinkRegex();
-    
-
-    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    internal partial class WordPercentage(BoneBot bot) : ModuleBase(bot)
     {
-        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
-        {
-            return MessageCheck(msgCreatedArgs.Message);
-        }
-        else if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
-        {
-            return MessageCheck(msgUpdatedArgs.Message);
-        }
+        private static readonly Regex Whitespace = WhitespaceRegex();
+        internal static readonly Regex Link = LinkRegex();
 
-        return false;
-    }
 
-    bool MessageCheck(DiscordMessage msg)
-    {
-        if (msg.Author?.IsBot ?? true)
-            return false;
-        
-        if (msg.Channel is null || !Config.values.channelsWhereMessagesMustHaveMinPercOfAWord.Contains(msg.Channel.Id))
+        protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
         {
+            if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
+            {
+                return MessageCheck(msgCreatedArgs.Message);
+            }
+
+            if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
+            {
+                return MessageCheck(msgUpdatedArgs.Message);
+            }
+
             return false;
         }
-        
-        if (msg.Timestamp.AddDays(1) < DateTime.Now)
-            return false; // message is old enough to probably not be relevant
-        
-        // will ignore link-only messages & attachment-only no-content messages
-        if (string.IsNullOrWhiteSpace(Link.Replace(msg.Content, "")))
+
+        private bool MessageCheck(DiscordMessage msg)
+        {
+            if (msg.Author?.IsBot ?? true)
+                return false;
+
+            if (msg.Channel is null || !Config.values.channelsWhereMessagesMustHaveMinPercOfAWord.Contains(msg.Channel.Id))
+            {
+                return false;
+            }
+
+            if (msg.Timestamp.AddDays(1) < DateTime.Now)
+                return false; // message is old enough to probably not be relevant
+
+            // will ignore link-only messages & attachment-only no-content messages
+            if (string.IsNullOrWhiteSpace(Link.Replace(msg.Content, "")))
+                return false;
+
+            var checkWordsAgainst = msg.Content.Replace('’', '\'').Replace("'", "");
+            var words = Whitespace.Split(checkWordsAgainst);
+            if (WordPercentageIsTooLow(words))
+            {
+                TryDeleteDontCare(msg, "you must use more of the designated words in this channel. woe.");
+
+                return true;
+            }
+
+            if (AlLWordsClumpedTogether(words))
+            {
+                TryDeleteDontCare(msg, "you .");
+
+                return true;
+            }
+
             return false;
-
-        string checkWordsAgainst = msg.Content.Replace('’', '\'').Replace("'", "");
-        var words = Whitespace.Split(checkWordsAgainst);
-        if (WordPercentageIsTooLow(words))
-        {
-            TryDeleteDontCare(msg, "you must use more of the designated words in this channel. woe.");
-
-            return true;
         }
 
-        if (AlLWordsClumpedTogether(words))
+        private bool AlLWordsClumpedTogether(string[] words)
         {
-            TryDeleteDontCare(msg, "you .");
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool AlLWordsClumpedTogether(string[] words)
-    {
-        bool[] wordsThatCount = words.Select(w =>
-            Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))
+            var wordsThatCount = words.Select(w =>
+                Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))
             ).ToArray();
 
-        List<int> chunkSizeLengths = new(4);
-        int currChunkSize = 0;
-        foreach (bool counts in wordsThatCount)
-        {
-            if (counts)
+            List<int> chunkSizeLengths = new(4);
+            var currChunkSize = 0;
+            foreach (var counts in wordsThatCount)
             {
-                currChunkSize++;
-            }
-            else
-            {
-                if (currChunkSize > 0)
-                    chunkSizeLengths.Add(currChunkSize);
-                
-                currChunkSize = 0;
-            }
-        }
-        
-        if (currChunkSize != 0)
-            chunkSizeLengths.Add(currChunkSize);
-        
-        Logger.Put($"message {string.Join(", ", words)} has the following chunk sizes: {string.Join(", ", chunkSizeLengths)}");
+                if (counts)
+                {
+                    currChunkSize++;
+                }
+                else
+                {
+                    if (currChunkSize > 0)
+                        chunkSizeLengths.Add(currChunkSize);
 
-        if (chunkSizeLengths is [1])
+                    currChunkSize = 0;
+                }
+            }
+
+            if (currChunkSize != 0)
+                chunkSizeLengths.Add(currChunkSize);
+
+            Logger.Put($"message {string.Join(", ", words)} has the following chunk sizes: {string.Join(", ", chunkSizeLengths)}");
+
+            if (chunkSizeLengths is [1])
+                return false;
+            // if there's one chunk of more than 3 words, and it's at the end
+            if (chunkSizeLengths.Count == 1 && chunkSizeLengths[0] > 3 && wordsThatCount.EndsWith(true))
+                return true;
+            // more than 3 chunks & more than half the word chunks are over 3 long
+            if (chunkSizeLengths.Count > 3 && chunkSizeLengths.Count(c => c > 2) > chunkSizeLengths.Count / 2)
+                return true;
+
             return false;
-        // if there's one chunk of more than 3 words, and it's at the end
-        else if (chunkSizeLengths.Count == 1 && chunkSizeLengths[0] > 3 && wordsThatCount.EndsWith(true))
-            return true;
-        // more than 3 chunks & more than half the word chunks are over 3 long
-        else if (chunkSizeLengths.Count > 3 && chunkSizeLengths.Count(c => c > 2) > (chunkSizeLengths.Count / 2))
-            return true;
+        }
 
-        return false;
+        private static bool WordPercentageIsTooLow(string[] words)
+        {
+            var wordPerc = words.Length == 0
+                ? 1
+                : words.Count(w => Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
+            var wordPercTooLow = wordPerc < Config.values.wordPercentage;
+            return wordPercTooLow;
+        }
+
+        [GeneratedRegex(@"\s+")]
+        private static partial Regex WhitespaceRegex();
+
+        [GeneratedRegex(@"\w+://\S+", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
+        private static partial Regex LinkRegex();
     }
-
-    private static bool WordPercentageIsTooLow(string[] words)
-    {
-        var wordPerc = words.Length == 0 ? 1 : words.Count(w => Config.values.theWordOrWords.Any(s => w.Contains(s, StringComparison.InvariantCultureIgnoreCase))) / (float)words.Length;
-        bool wordPercTooLow = wordPerc < Config.values.wordPercentage;
-        return wordPercTooLow;
-    }
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
-    [GeneratedRegex(@"\w+://\S+", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex LinkRegex();
 }

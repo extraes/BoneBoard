@@ -156,6 +156,8 @@ internal class Config
 
     public string pictureFramePngPath = "./Assets/pictureframe.png";
 
+    public ulong[] channelsWhereMsgsMustStartWithPrevMsgsLastChar = [];
+
     static Config()
     {
         Console.WriteLine("Initializing config");

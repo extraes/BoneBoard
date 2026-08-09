@@ -21,26 +21,6 @@ namespace BoneBoard;
 [SuppressMessage("ReSharper", "AccessToModifiedClosure")]
 internal static partial class Quoter
 {
-    internal static readonly Regex UserMention = BakedRegex_UserMention();
-    [GeneratedRegex(@"<@!?(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex BakedRegex_UserMention();
-
-    internal static readonly Regex RoleMention = BakedRegex_RoleMention();
-    [GeneratedRegex(@"<@&(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex BakedRegex_RoleMention();
-
-    internal static readonly Regex ChannelMention = BakedRegex_ChannelMention();
-    [GeneratedRegex(@"<#(\d+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex BakedRegex_ChannelMention();
-
-    internal static readonly Regex Link = BakedRegex_Link();
-    [GeneratedRegex(@"\w+://\S+", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex BakedRegex_Link();
-
-    internal static readonly Regex CustomEmoji = BakedRegex_CustomEmoji();
-    [GeneratedRegex(@"<a?:([\w0-9]+):([0-9]+)>", RegexOptions.IgnoreCase | RegexOptions.ECMAScript, "en-US")]
-    private static partial Regex BakedRegex_CustomEmoji();
-
     private static readonly HttpClient PfpGetter = new();
     private static readonly HttpClient MediaGetter = new();
     private static readonly HttpClient EmojiGetter = new();
@@ -142,10 +122,10 @@ internal static partial class Quoter
         }
 
         MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
-        cleanContent = UserMention.Replace(startingContent, userMentionEvaluator);
+        cleanContent = RegularExpressions.UserMention.Replace(startingContent, userMentionEvaluator);
 
         MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
-        cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
+        cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, channelMentionEvaluator);
 
         if (msg.Attachments.Any()) mediaThumb = msg.Attachments[0].Url;
 
@@ -193,7 +173,7 @@ internal static partial class Quoter
         {
             try
             {
-                cleanContent = Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
+                cleanContent = RegularExpressions.Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
 
                 if (cleanContent == "<Link>")
                     cleanContent = "";
@@ -211,7 +191,7 @@ internal static partial class Quoter
         List<Match> customEmojis = MatchedCustomEmojis;
         customEmojis.Clear();
         MatchEvaluator emojiMentionEvaluator = match => { customEmojis.Add(match); return CUSTOM_EMOJI_SUBSTITUTE; };
-        cleanContent = CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
+        cleanContent = RegularExpressions.CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
 
         if (string.IsNullOrWhiteSpace(cleanContent) && media is null)
             subtext = "So true...";
@@ -344,17 +324,17 @@ internal static partial class Quoter
     {
         string cleanContent = msg.Content;
         MatchEvaluator userMentionEvaluator = match => ReplaceIdWithUser(match, clint, guild);
-        cleanContent = UserMention.Replace(cleanContent, userMentionEvaluator);
+        cleanContent = RegularExpressions.UserMention.Replace(cleanContent, userMentionEvaluator);
 
         MatchEvaluator channelMentionEvaluator = match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild);
-        cleanContent = ChannelMention.Replace(cleanContent, channelMentionEvaluator);
+        cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, channelMentionEvaluator);
         
         MatchEvaluator roleMentionEvaluator = match => ReplaceIdWithRole(match, clint, guild);
-        cleanContent = RoleMention.Replace(cleanContent, roleMentionEvaluator);
+        cleanContent = RegularExpressions.RoleMention.Replace(cleanContent, roleMentionEvaluator);
 
-        cleanContent = CustomEmoji.Replace(cleanContent, ":$1:");
+        cleanContent = RegularExpressions.CustomEmoji.Replace(cleanContent, ":$1:");
 
-        cleanContent = Link.Replace(cleanContent, "<Link>");
+        cleanContent = RegularExpressions.Link.Replace(cleanContent, "<Link>");
 
         if (cleanContent == "<Link>")
             cleanContent = "";

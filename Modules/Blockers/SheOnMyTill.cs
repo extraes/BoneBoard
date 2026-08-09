@@ -26,6 +26,7 @@ internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
         return false;
     }
 
+    // True: block message. False: don't block message
     protected bool MessageCheck(DiscordMessage msg)
     {
         if (bot.IsMe(msg.Author))
@@ -40,9 +41,9 @@ internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
         if (string.IsNullOrWhiteSpace(Formatter.Strip(msg.Content)))
             return false;
 
-        if (Quoter.Link.Replace(msg.Content, "") == "")
+        if (RegularExpressions.Link.Replace(msg.Content, "") == "")
             return false;
-        Regex symbols = SymbolRegex();
+        Regex symbols = RegularExpressions.SymbolRegex;
 
         string cleanContent = symbols.Replace(msg.Content, "");
 
@@ -65,6 +66,5 @@ internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
         return false;
     }
 
-    [GeneratedRegex(@"["",.']")]
-    private static partial Regex SymbolRegex();
+    
 }

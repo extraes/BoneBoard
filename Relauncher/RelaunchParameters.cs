@@ -1,17 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
 // ReSharper disable once CheckNamespace
+
 public record class RelaunchParameters
 {
     internal const string RELAUNCHED_ARG = "RELAUNCHED";
 
     public string? buildProject;
+    public ulong? initiatorId;
     public string? launchExecutable;
     public string? launchWorkingDir;
-    public ulong? initiatorId = null;
 
     public List<string> BuildLaunchParameters()
     {
@@ -20,30 +16,30 @@ public record class RelaunchParameters
         [
             "BUILD=" + buildProject,
             "CONT=" + launchExecutable,
-            "PWD=" + launchWorkingDir,
+            "PWD=" + launchWorkingDir
         ];
         if (initiatorId.HasValue)
             ret.Add("USERID=" + initiatorId.Value);
-        
+
         return ret;
     }
 
     public static RelaunchParameters? Parse(string[] args)
     {
-        string buildProject = args.First(arg => arg.StartsWith("BUILD=")).Replace("BUILD=", ""); // full path
-        string continueWith = args.First(arg => arg.StartsWith("CONT=")).Replace("CONT=", ""); // full path
-        string continueRootFolder = args.First(arg => arg.StartsWith("PWD=")).Replace("PWD=", "");
-        string? initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
+        var buildProject = args.First(arg => arg.StartsWith("BUILD=")).Replace("BUILD=", ""); // full path
+        var continueWith = args.First(arg => arg.StartsWith("CONT=")).Replace("CONT=", ""); // full path
+        var continueRootFolder = args.First(arg => arg.StartsWith("PWD=")).Replace("PWD=", "");
+        var initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
 
         ulong.TryParse(initiatorId ?? "", out var id);
         Console.WriteLine($"Initiator ID: {initiatorId}");
-        
+
         RelaunchParameters ret = new()
         {
             buildProject = buildProject,
             launchExecutable = continueWith,
             launchWorkingDir = continueRootFolder,
-            initiatorId = id == default ? null : id,
+            initiatorId = id == default ? null : id
         };
 
         return ret;
@@ -53,42 +49,44 @@ public record class RelaunchParameters
     {
         if (!Enumerable.Contains(args, RELAUNCHED_ARG))
             return null;
-        
-        string? initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
+
+        var initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
 
         ulong.TryParse(initiatorId ?? "", out var id);
         Console.WriteLine($"Initiator ID: {initiatorId}");
 
         return id == default ? null : id;
     }
-    
+
 #if !RELAUNCHER
-    private static bool sentMessage = false;
-    public static void SetupProcessStartMessage(string[] args, DSharpPlus.DiscordClientBuilder clientBuilder)
+    private static bool sentMessage;
+
+    public static void SetupProcessStartMessage(string[] args, DiscordClientBuilder clientBuilder)
     {
         Logger.Put("Launched with arguments...");
-        foreach (string arg in args)
+        foreach (var arg in args)
         {
             Logger.Put(" - " + arg);
         }
+
         Logger.Put($"From working dir: {Environment.CurrentDirectory}");
         if (!args.Contains(RELAUNCHED_ARG))
             return;
-        
-        
-        string? initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
+
+
+        var initiatorId = args.FirstOrDefault(arg => arg.StartsWith("USERID="))?.Replace("USERID=", ""); // optional
 
         ulong.TryParse(initiatorId ?? "", out var id);
         if (id == default)
             return;
 
-        string buildOutput = args.First(arg => arg.Contains("dotnet build"));
+        var buildOutput = args.First(arg => arg.Contains("dotnet build"));
         clientBuilder.ConfigureEventHandlers(x =>
             x.HandleSessionCreated((clint, sArgs) => RelaunchThunk(buildOutput, id, clint, sArgs)));
     }
 
     private static async Task RelaunchThunk(string buildOutput, ulong initiatorId,
-        DSharpPlus.DiscordClient client, DSharpPlus.EventArgs.SessionCreatedEventArgs args)
+        DiscordClient client, SessionCreatedEventArgs args)
     {
         if (sentMessage)
             return;
@@ -97,12 +95,12 @@ public record class RelaunchParameters
             var initiator = await client.GetUserAsync(initiatorId);
             var channel = await initiator.CreateDmChannelAsync();
 
-            StringBuilder sb = new();
-            sb.AppendLine($"## Restarted successfully!");
+            System.Text.StringBuilder sb = new();
+            sb.AppendLine("## Restarted successfully!");
             sb.AppendLine(buildOutput);
-            
+
             await channel.SendMessageAsync(Logger.EnsureShorterThan(sb.ToString(), 2000));
-            
+
             Logger.Put($"Successfully DMed initiator ({initiatorId}) to tell them dotnet build output!");
         }
         catch (Exception e)

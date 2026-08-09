@@ -1,78 +1,73 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BoneBoard;
-
-internal partial class Hangman
+﻿namespace BoneBoard
 {
-    private static string[] hangmanStates =
-    [
-        """
-            +---+
-            |   |
-                |
-                |
-                |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-                |
-                |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-            |   |
-                |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-           /|   |
-                |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-           /|\  |
-                |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-           /|\  |
-           /    |
-                |
-        =========
-        """,
-        """
-            +---+
-            |   |
-            O   |
-           /|\  |
-           / \  |
-                |
-        =========
-        congrats you guys killed him
-        """
-    ];
+    internal partial class Hangman
+    {
+        private static readonly string[] hangmanStates =
+        [
+            """
+                +---+
+                |   |
+                    |
+                    |
+                    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+                    |
+                    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+                |   |
+                    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+               /|   |
+                    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+               /|\  |
+                    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+               /|\  |
+               /    |
+                    |
+            =========
+            """,
+            """
+                +---+
+                |   |
+                O   |
+               /|\  |
+               / \  |
+                    |
+            =========
+            congrats you guys killed him
+            """
+        ];
+    }
 }

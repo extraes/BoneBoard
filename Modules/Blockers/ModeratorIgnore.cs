@@ -1,183 +1,180 @@
-﻿using DSharpPlus.Commands.Processors.SlashCommands;
-using DSharpPlus.Commands.Trees.Metadata;
-using DSharpPlus.Commands;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DSharpPlus.EventArgs;
-using DSharpPlus.Entities;
-using System.Reflection;
+﻿using System.ComponentModel;
 using System.Diagnostics;
-using DSharpPlus.Commands.ContextChecks;
-using System.ComponentModel;
 using CircularBuffer;
-using DSharpPlus;
+using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Trees.Metadata;
 
-namespace BoneBoard.Modules.Blockers;
-
-[AllowedProcessors(typeof(SlashCommandProcessor))]
-[Command("starignore")]
-internal class ModeratorIgnore(BoneBot bot) : ModuleBase(bot)
+namespace BoneBoard.Modules.Blockers
 {
-    static CircularBuffer<ulong> ignoredMessages = new(128);
-    static int eventsProcessed = 0;
-    static Stopwatch timeWasted = new();
-    public enum TimeUnit
+    [AllowedProcessors(typeof(SlashCommandProcessor))]
+    [Command("starignore")]
+    internal class ModeratorIgnore(BoneBot bot) : ModuleBase(bot)
     {
-        Seconds,
-        Minutes,
-        Hours
-    }
-
-    struct IgnoreData
-    {
-        public DateTime? ignoreTime;
-        public int? ignoreCount;
-    }
-
-    static Dictionary<DiscordUser, IgnoreData> ignoreCounts = new();
-
-    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
-    {
-        timeWasted.Start();
-        DiscordMessage? msg = eventArgs switch
+        public enum TimeUnit
         {
-            MessageCreatedEventArgs created => created.Message,
-            MessageDeletedEventArgs deleted => deleted.Message,
-            MessageUpdatedEventArgs updated => updated.Message,
-            _ => null
-        };
-        
-        DiscordUser? user = msg?.Author ?? GetUser(eventArgs);
-        eventsProcessed++;
-        timeWasted.Stop();
+            Seconds,
+            Minutes,
+            Hours
+        }
 
-        if (msg is not null && ignoredMessages.Contains(msg.Id))
-            return true;
-        
-        if (user is null)
-            return false;
+        private static readonly CircularBuffer<ulong> ignoredMessages = new(128);
+        private static int eventsProcessed;
+        private static readonly Stopwatch timeWasted = new();
 
-        if (!ignoreCounts.TryGetValue(user, out IgnoreData data))
-            return false;
+        private static readonly Dictionary<DiscordUser, IgnoreData> ignoreCounts = new();
 
-        if (data.ignoreTime.HasValue)
+        protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
         {
-            if (data.ignoreTime.Value < DateTime.Now)
+            timeWasted.Start();
+            var msg = eventArgs switch
             {
-                ignoreCounts.Remove(user);
+                MessageCreatedEventArgs created => created.Message,
+                MessageDeletedEventArgs deleted => deleted.Message,
+                MessageUpdatedEventArgs updated => updated.Message,
+                _ => null
+            };
+
+            var user = msg?.Author ?? GetUser(eventArgs);
+            eventsProcessed++;
+            timeWasted.Stop();
+
+            if (msg is not null && ignoredMessages.Contains(msg.Id))
+                return true;
+
+            if (user is null)
                 return false;
+
+            if (!ignoreCounts.TryGetValue(user, out var data))
+                return false;
+
+            if (data.ignoreTime.HasValue)
+            {
+                if (data.ignoreTime.Value < DateTime.Now)
+                {
+                    ignoreCounts.Remove(user);
+                    return false;
+                }
+
+                if (msg is not null)
+                    ignoredMessages.PushBack(msg.Id);
+
+                return true;
             }
 
-            if (msg is not null)
-                ignoredMessages.PushBack(msg.Id);
-            
-            return true;
-        }
-
-        if (data.ignoreCount.HasValue)
-        {
-            if (data.ignoreCount.Value <= 0)
+            if (data.ignoreCount.HasValue)
             {
-                ignoreCounts.Remove(user);
-                return false;
+                if (data.ignoreCount.Value <= 0)
+                {
+                    ignoreCounts.Remove(user);
+                    return false;
+                }
+
+                data.ignoreCount--;
+                ignoreCounts[user] = data;
+
+                if (msg is not null)
+                    ignoredMessages.PushBack(msg.Id);
+
+                return true;
             }
 
-            data.ignoreCount--;
-            ignoreCounts[user] = data;
-
-            if (msg is not null)
-                ignoredMessages.PushBack(msg.Id);
-            
-            return true;
+            Logger.Warn("Both ignorecount and ignoretime are null! This should not happen!");
+            if (Debugger.IsAttached)
+                Debugger.Break();
+            return false;
         }
 
-        Logger.Warn("Both ignorecount and ignoretime are null! This should not happen!");
-        if (Debugger.IsAttached)
-            Debugger.Break();
-        return false;
-    }
-
-    [Command("forTime"), Description("Ignores you/someone else for a given length of time")]
-    [RequireApplicationOwner]
-    public static async Task IgnoreFor(SlashCommandContext ctx, int count, TimeUnit unit, DiscordMember? member = null, bool overwrite = true)
-    {
-        member ??= ctx.Member;
-        if (member is null)
+        [Command("forTime")]
+        [Description("Ignores you/someone else for a given length of time")]
+        [RequireApplicationOwner]
+        public static async Task IgnoreFor(SlashCommandContext ctx, int count, TimeUnit unit, DiscordMember? member = null, bool overwrite = true)
         {
-            await ctx.RespondAsync("😂👎", true);
-            return;
+            member ??= ctx.Member;
+            if (member is null)
+            {
+                await ctx.RespondAsync("😂👎", true);
+                return;
+            }
+
+            if (count <= 0)
+            {
+                await ctx.RespondAsync("fuck i look like a time traveler??", true);
+                return;
+            }
+
+            if (ignoreCounts.ContainsKey(member) && !overwrite)
+            {
+                await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
+                return;
+            }
+
+            var addedTime = unit switch
+            {
+                TimeUnit.Seconds => TimeSpan.FromSeconds(count),
+                TimeUnit.Minutes => TimeSpan.FromMinutes(count),
+                TimeUnit.Hours => TimeSpan.FromHours(count),
+                _ => TimeSpan.FromMinutes(count)
+            };
+
+            IgnoreData newData = new()
+            {
+                ignoreTime = DateTime.Now + addedTime
+            };
+
+            ignoreCounts[member] = newData;
+            await ctx.RespondAsync(
+                $"{member.DisplayName} will now be ignored until {Formatter.Timestamp(newData.ignoreTime.Value, TimestampFormat.ShortDateTime)}", true);
         }
 
-        if (count <= 0)
+        [Command("forCount")]
+        [Description("Ignores you/someone else for a given number of events")]
+        [RequireGuild]
+        [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+        public static async Task IgnoreFor(SlashCommandContext ctx, int count, DiscordMember? member = null, bool overwrite = true)
         {
-            await ctx.RespondAsync("fuck i look like a time traveler??", true);
-            return;
+            member ??= ctx.Member;
+            if (member is null || BoneBot.Bots[ctx.Client].IsMe(member))
+            {
+                await ctx.RespondAsync("😂👎", true);
+                return;
+            }
+
+            if (count <= 0)
+            {
+                await ctx.RespondAsync("i cant change whats been done bro", true);
+                return;
+            }
+
+            if (ignoreCounts.ContainsKey(member) && !overwrite)
+            {
+                await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
+                return;
+            }
+
+            IgnoreData newData = new()
+            {
+                ignoreCount = count
+            };
+
+            ignoreCounts[member] = newData;
+            await ctx.RespondAsync($"{member.DisplayName} will now be ignored for the next {count} event(s) that are associated with them.", true);
         }
 
-        if (ignoreCounts.ContainsKey(member) && !overwrite)
+        [Command("profilington")]
+        [Description("Check how long this shitass code has executed!")]
+        [RequireGuild]
+        [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
+        public static async Task DumpTimes(SlashCommandContext ctx)
         {
-            await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
-            return;
+            await ctx.RespondAsync($"GetUser has executed {eventsProcessed} time(s) and wasted {timeWasted.Elapsed.TotalSeconds} seconds of CPU time!", true);
         }
 
-        TimeSpan addedTime = unit switch
+        private struct IgnoreData
         {
-            TimeUnit.Seconds => TimeSpan.FromSeconds(count),
-            TimeUnit.Minutes => TimeSpan.FromMinutes(count),
-            TimeUnit.Hours => TimeSpan.FromHours(count),
-            _ => TimeSpan.FromMinutes(count),
-        };
-
-        IgnoreData newData = new()
-        {
-            ignoreTime = DateTime.Now + addedTime
-        };
-
-        ignoreCounts[member] = newData;
-        await ctx.RespondAsync($"{member.DisplayName} will now be ignored until {Formatter.Timestamp(newData.ignoreTime.Value, TimestampFormat.ShortDateTime)}", true);
-    }
-
-    [Command("forCount"), Description("Ignores you/someone else for a given number of events")]
-    [RequireGuild]
-    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task IgnoreFor(SlashCommandContext ctx, int count, DiscordMember? member = null, bool overwrite = true)
-    {
-        member ??= ctx.Member;
-        if (member is null || BoneBot.Bots[ctx.Client].IsMe(member))
-        {
-            await ctx.RespondAsync("😂👎", true);
-            return;
+            public DateTime? ignoreTime;
+            public int? ignoreCount;
         }
-
-        if (count <= 0)
-        {
-            await ctx.RespondAsync("i cant change whats been done bro", true);
-            return;
-        }
-
-        if (ignoreCounts.ContainsKey(member) && !overwrite)
-        {
-            await ctx.RespondAsync($"{member.DisplayName} is already ignored", true);
-            return;
-        }
-
-        IgnoreData newData = new()
-        {
-            ignoreCount = count
-        };
-
-        ignoreCounts[member] = newData;
-        await ctx.RespondAsync($"{member.DisplayName} will now be ignored for the next {count} event(s) that are associated with them.", true);
-    }
-
-    [Command("profilington"), Description("Check how long this shitass code has executed!")]
-    [RequireGuild]
-    [RequirePermissions([], [DiscordPermission.ManageRoles, DiscordPermission.ManageMessages])]
-    public static async Task DumpTimes(SlashCommandContext ctx)
-    {
-        await ctx.RespondAsync($"GetUser has executed {eventsProcessed} time(s) and wasted {timeWasted.Elapsed.TotalSeconds} seconds of CPU time!", true);
     }
 }
