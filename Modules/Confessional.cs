@@ -12,6 +12,7 @@ using OpenAI;
 using Csv;
 using OpenAI.Chat;
 using System.ComponentModel;
+using System.Globalization;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus;
 
@@ -48,8 +49,7 @@ internal class Confessional : ModuleBase
         }
     }
 
-    // todo: propertyize
-    Dictionary<DiscordMember, DateTime> confessions = new();
+    private static readonly Dictionary<DiscordMember, DateTime> Confessions = [];
     List<DiscordMessage> confessionsByAi = [];
     static TextWriter? csvConfessional;
     Task? occasionalConfessional;
@@ -273,9 +273,9 @@ internal class Confessional : ModuleBase
 
             if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
             {
-                if (confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+                if (Confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
                     return null;
-                confessions[member] = DateTime.Now;
+                Confessions[member] = DateTime.Now;
             }
         }
 
@@ -324,7 +324,7 @@ internal class Confessional : ModuleBase
         string[] values =
         [
             bot.IsMe(member) ? "AI" : "Human",
-            DateTime.Now.ToString(),
+            DateTime.Now.ToString(CultureInfo.InvariantCulture),
             text
             //context
         ];
@@ -380,7 +380,7 @@ internal class Confessional : ModuleBase
 
             if (!DiscordEmoji.TryFromUnicode(Config.values.aiConfessionIsHumanEmoji, out humanEmoji))
                 if (ulong.TryParse(Config.values.aiConfessionIsHumanEmoji, out ulong humanEmojiId))
-                    DiscordEmoji.TryFromGuildEmote(bot.client, humanEmojiId, out botEmoji);
+                    DiscordEmoji.TryFromGuildEmote(bot.client, humanEmojiId, out humanEmoji);
 
             // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
             if (botEmoji is null)
@@ -388,7 +388,8 @@ internal class Confessional : ModuleBase
                 Logger.Put($"Failed to get DiscordEmoji from '{Config.values.aiConfessionIsBotEmoji}' for confessional AI-or-not reactions! Bailing!");
                 return;
             }
-
+            
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
             if (humanEmoji is null)
             {
                 Logger.Put($"Failed to get DiscordEmoji from '{Config.values.aiConfessionIsHumanEmoji}' for confessional AI-or-not reactions! Bailing!");
@@ -495,7 +496,7 @@ internal class Confessional : ModuleBase
 
         if (Config.values.confessionalRestrictions.HasFlag(ConfessionalRequirements.COOLDOWN))
         {
-            if (confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
+            if (Confessions.TryGetValue(member, out DateTime lastConfession) && (DateTime.Now - lastConfession).TotalHours < 6)
             {
                 await ctx.FollowupAsync("You've already confessed in the last 6 hours, so your confession can't be rewritten.", true);
                 return;
@@ -527,7 +528,7 @@ internal class Confessional : ModuleBase
                 new SystemChatMessage(Config.values.openAiConfessionRewritePrompt),
                 new UserChatMessage(confessionToRewrite)
             ]);
-            rewritten = res.Value.Content[res.Value.Content.Count - 1].Text;
+            rewritten = res.Value.Content[^1].Text;
         }
         catch (Exception ex)
         {

@@ -37,6 +37,29 @@ public partial class ModuleBase
     }
     
     [DebuggerStepThrough]
+    protected async void TryDeleteDontCare(DiscordMessage? msg, DiscordUser? user, DiscordEmoji? emoji, string? reason = null)
+    {
+        try
+        {
+            if (msg is null || user is null || emoji is null)
+                return;
+            if (reason is not null)
+                Logger.Put($"Deleting {emoji.GetDiscordName()} reaction from {user} on {msg} for reason '{reason}'");
+            
+            await msg.DeleteReactionAsync(emoji, user, reason);
+        }
+        catch (DiscordException ex)
+        {
+            //could possibly return it?
+            Logger.Warn($"{GetType().Name} failed to delete message (DiscordException) {msg}", ex);
+        }
+        catch (Exception e)
+        {
+            Logger.Warn($"{GetType().Name} failed to delete message (Unknown exception) {msg}", e);
+        }
+    }
+    
+    [DebuggerStepThrough]
     protected async Task<bool> TryDeleteAsync(DiscordMessage? msg, string? reason = null)
     {
         try

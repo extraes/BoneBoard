@@ -1,4 +1,4 @@
-﻿using System.ClientModel;
+using System.ClientModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Azure.AI.OpenAI;

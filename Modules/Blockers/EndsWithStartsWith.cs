@@ -37,24 +37,23 @@ namespace BoneBoard.Modules.Blockers
                 || msgQueue.Count == 0)
                 return false;
 
-            var mostRecentMsg = msgQueue.Last();
 
-            // Is likely a tenor/klipy GIF or something
-            var hasMediaEmbed = mostRecentMsg.Attachments.Count > 0
-                                || mostRecentMsg.Embeds.Any(e => e.Type is "image" or "gif" or "gifv" or "video");
-            if (string.IsNullOrWhiteSpace(RegularExpressions.Link.Replace(mostRecentMsg.Content, ""))
-                && hasMediaEmbed)
-                return false;
+            char lastLetterOfLast = default;
 
-            var lastLetterOfLast = mostRecentMsg.Content.LastOrDefault(char.IsLetter);
+            foreach (var mostRecentMsg in msgQueue.Where(m => m.Id != msg.Id).Reverse())
+            {
+                if (TryGetLastChar(mostRecentMsg, out lastLetterOfLast))
+                    break;
+            }
+            
             if (lastLetterOfLast == default)
                 return false; // just give them a pass
 
-            var firstLetterOfThis = msg.Content.FirstOrDefault(char.IsLetter);
-            if (firstLetterOfThis == default)
-                return false; // likewise, give this poster a pass.
 
-            var lettersMatch = char.ToLower(lastLetterOfLast) == char.ToLower(firstLetterOfThis);
+            if (!TryGetFirstChar(msg, out char firstLetter))
+                return false; // likewise, just give this poster a pass
+
+            var lettersMatch = char.ToLower(lastLetterOfLast) == char.ToLower(firstLetter);
             if (lettersMatch) return false;
 
             deletedMessages.Enqueue(msg);
@@ -70,6 +69,12 @@ namespace BoneBoard.Modules.Blockers
             if (!Config.values.channelsWhereMsgsMustStartWithPrevMsgsLastChar.Contains(args.Channel.Id))
                 return Task.CompletedTask;
 
+            if (!TryGetLastChar(args.Message, out _))
+            {
+                Logger.Put($"Ignoring message because it didn't have a valid last character/letter: '{args.Message.Content}'");
+                return Task.CompletedTask;
+            }
+
             // Yes I know a List isn't a Queue. I'm just going to use it like a queue.
             if (!lastMessages.TryGetValue(args.Channel, out var msgQueue))
             {
@@ -78,7 +83,7 @@ namespace BoneBoard.Modules.Blockers
             }
 
             msgQueue.Add(args.Message);
-            if (msgQueue.Count > 5)
+            if (msgQueue.Count > 8)
                 msgQueue.RemoveAt(0);
             return Task.CompletedTask;
         }
@@ -113,6 +118,52 @@ namespace BoneBoard.Modules.Blockers
             }
 
             return Task.CompletedTask;
+        }
+        
+        private static bool TryGetLastChar(DiscordMessage msg, out char lastChar)
+        {
+            lastChar = default;
+            if (string.IsNullOrWhiteSpace(msg?.Content))
+            {
+                return false;
+            }
+            
+            string cleanContent = RegularExpressions.CustomEmoji.Replace(msg.Content, "<>");
+            cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, "<>");
+            cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<>");
+            
+            // Is likely a tenor/klipy GIF or something
+            var hasMediaEmbed = msg.Attachments.Count > 0
+                                || msg.Embeds.Any(e => e.Type is "image" or "gif" or "gifv" or "video");
+            if (string.IsNullOrWhiteSpace(RegularExpressions.Link.Replace(cleanContent, ""))
+                && hasMediaEmbed)
+                return false;
+            
+            lastChar = cleanContent.LastOrDefault(char.IsLetter);
+            
+            return lastChar != default;
+        }
+        
+        private static bool TryGetFirstChar(DiscordMessage msg, out char firstChar)
+        {
+            firstChar = default;
+            if (string.IsNullOrWhiteSpace(msg?.Content))
+            {
+                return false;
+            }
+            
+            string cleanContent = RegularExpressions.CustomEmoji.Replace(msg.Content, "<>");
+            cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, "<>");
+            cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<>");
+            cleanContent = RegularExpressions.Link.Replace(cleanContent, "");
+            
+            // Could be a tenor or klipy GIF, but Discord sometimes takes time to process those and embed them.
+            if (string.IsNullOrWhiteSpace(cleanContent))
+                return false;
+            
+            firstChar = cleanContent.FirstOrDefault(char.IsLetter);
+            
+            return firstChar != default;
         }
     }
 }
