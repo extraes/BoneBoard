@@ -27,7 +27,7 @@ internal class Config
     public string[] ignoreDiscordLogsFrom = [ "HttpClient" ];
     public bool logDiscordDebug = false;
 
-    public Dictionary<string, ulong> blockUsersFromChannels = [];
+    public Dictionary<string, ulong[]> blockUsersFromChannels = [];
     public ulong[] blockedUsers = [];
     public ulong[] requiredRoles = [];
     public ulong[] requiredEmojis = [];

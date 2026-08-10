@@ -17,8 +17,8 @@ public class BlockUserFromChannel(BoneBot bot) : ModuleBase(bot)
             {
                 channelId = mcea.Channel.Id;
                 user = mcea.Author;
-                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out ulong chId)
-                    && chId == channelId)
+                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out var channels)
+                    && channels.Contains(channelId))
                 {
                     TryDeleteDontCare(mcea.Message);
                     return true;
@@ -31,8 +31,8 @@ public class BlockUserFromChannel(BoneBot bot) : ModuleBase(bot)
                 channelId = muea.Channel.Id;
                 user = muea.Author;
                 
-                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out ulong chId)
-                    && chId == channelId)
+                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out var channels)
+                    && channels.Contains(channelId))
                 {
                     TryDeleteDontCare(muea.Message);
                     return true;
@@ -47,8 +47,8 @@ public class BlockUserFromChannel(BoneBot bot) : ModuleBase(bot)
                 
                 channelId = mdea.Channel.Id;
                 user = mdea.Message.Author;
-                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out ulong chId)
-                    && chId == channelId)
+                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out var channels)
+                    && channels.Contains(channelId))
                 {
                     return true;
                 }
@@ -60,8 +60,8 @@ public class BlockUserFromChannel(BoneBot bot) : ModuleBase(bot)
                 channelId = mrea.Channel.Id;
                 user = mrea.User;
 
-                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out ulong chId)
-                    && chId == channelId)
+                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out var channels)
+                    && channels.Contains(channelId))
                 {
                     TryDeleteDontCare(mrea.Message, mrea.User, mrea.Emoji, "User blocked from this channel");
                     return true;
@@ -74,8 +74,8 @@ public class BlockUserFromChannel(BoneBot bot) : ModuleBase(bot)
                 channelId = mrmea.Channel.Id;
                 user = mrmea.User;
 
-                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out ulong chId)
-                    && chId == channelId)
+                if (Config.values.blockUsersFromChannels.TryGetValue(user.Id.ToString(), out var channels)
+                    && channels.Contains(channelId))
                 {
                     return true;
                 }
