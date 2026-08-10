@@ -15,9 +15,6 @@ namespace BoneBoard.Modules.Blockers
 
             if (eventArgs is MessageUpdatedEventArgs muea)
             {
-                
-                
-                
                 return MessageCheck(muea.Message);
             }
 
@@ -43,16 +40,18 @@ namespace BoneBoard.Modules.Blockers
 
             char lastLetterOfLast = default;
 
-            // The use of >= makes the .Where filter out messages newer than our message
+            // The use of < makes the .Where filters for messages older than our message
             // (this is basically just the "support message edits" change)
-            foreach (var mostRecentMsg in msgQueue.Where(m => m.Id >= msg.Id).Reverse())
+            foreach (var mostRecentMsg in msgQueue.Where(m => m.Id < msg.Id).Reverse())
             {
                 if (TryGetLastChar(mostRecentMsg, out lastLetterOfLast))
                     break;
             }
-            
+
             if (lastLetterOfLast == default)
+            {
                 return false; // just give them a pass
+            }
 
 
             if (!TryGetFirstChar(msg, out char firstLetter))
