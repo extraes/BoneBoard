@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace BoneBoard.Modules.Blockers
 {
     public class EndsWithStartsWith(BoneBot bot) : ModuleBase(bot)
@@ -57,7 +59,12 @@ namespace BoneBoard.Modules.Blockers
             if (!TryGetFirstChar(msg, out char firstLetter))
                 return false; // likewise, just give this poster a pass
 
-            var lettersMatch = char.ToLower(lastLetterOfLast) == char.ToLower(firstLetter);
+                    
+            bool lettersMatch = CultureInfo.InvariantCulture.CompareInfo.Compare(
+                    lastLetterOfLast.ToString(),
+                    firstLetter.ToString(),
+                    CompareOptions.IgnoreNonSpace | CompareOptions.IgnoreCase
+                ) == 0;
             if (lettersMatch) return false;
 
             deletedMessages.Enqueue(msg);
