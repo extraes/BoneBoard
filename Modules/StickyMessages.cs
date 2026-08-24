@@ -3,215 +3,214 @@ using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 
-namespace BoneBoard.Modules
+namespace BoneBoard.Modules;
+
+[Command("sticky")]
+internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
 {
-    [Command("sticky")]
-    internal class StickyMessages(BoneBot bot) : ModuleBase(bot)
+    private static readonly List<DiscordMessage> needRecache = [];
+    private static List<DiscordMessage> stickyMessages = [];
+
+    protected override async Task FetchGuildResources()
     {
-        private static readonly List<DiscordMessage> needRecache = [];
-        private static List<DiscordMessage> stickyMessages = [];
+        stickyMessages.Clear();
 
-        protected override async Task FetchGuildResources()
+        foreach (var jumpLink in PersistentData.values.stickiedMessages)
         {
-            stickyMessages.Clear();
+            var msg = await bot.GetMessageFromLink(jumpLink);
 
-            foreach (var jumpLink in PersistentData.values.stickiedMessages)
+            if (msg is not null)
             {
-                var msg = await bot.GetMessageFromLink(jumpLink);
-
-                if (msg is not null)
-                {
-                    stickyMessages.Add(msg);
-                    Logger.Put($"Found sticky message @ {jumpLink} in {msg.Channel}");
-                }
-                else
-                {
-                    Logger.Put($"Couldn't find sticky message @ {jumpLink} -- ignoring!");
-                }
+                stickyMessages.Add(msg);
+                Logger.Put($"Found sticky message @ {jumpLink} in {msg.Channel}");
             }
-
-            UpdatePersistentData();
-            Logger.Put($"Initialized with {stickyMessages.Count} messages in {stickyMessages.Select(m => m.ChannelId).Distinct().Count()} channels");
+            else
+            {
+                Logger.Put($"Couldn't find sticky message @ {jumpLink} -- ignoring!");
+            }
         }
 
-        protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
+        UpdatePersistentData();
+        Logger.Put($"Initialized with {stickyMessages.Count} messages in {stickyMessages.Select(m => m.ChannelId).Distinct().Count()} channels");
+    }
+
+    protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
+    {
+        if (args.Author.IsBot || bot.IsMe(args.Author))
+            return;
+
+        switch (args.Message.MessageType)
         {
-            if (args.Author.IsBot || bot.IsMe(args.Author))
+            case DiscordMessageType.Reply:
+            case DiscordMessageType.AutoModerationAlert:
+            case DiscordMessageType.Default:
+                // only resend the message whenever a new substantial message is sent 
+                break;
+            default:
+                if (args.Message.Reference is not null)
+                    break; // probably a crosspost, continue to repost
                 return;
+        }
 
-            switch (args.Message.MessageType)
+
+        var prelength = stickyMessages.Count;
+        stickyMessages = stickyMessages.DistinctBy(m => m.Id).ToList();
+        // Logger.Put($"Removed {prelength - stickyMessages.Count} duplicates from stickymessages", LogType.Trace);
+
+        Lazy<List<DiscordMessage>> newMessages = new();
+        Lazy<List<DiscordMessage>> deletedStickies = new();
+
+        for (var i = stickyMessages.Count - 1; i >= 0; i--)
+        {
+            var sticky = stickyMessages[i];
+            if (sticky.ChannelId != args.Message.ChannelId)
+                continue;
+
+            var content = sticky.Content;
+            if (needRecache.Contains(sticky))
             {
-                case DiscordMessageType.Reply:
-                case DiscordMessageType.AutoModerationAlert:
-                case DiscordMessageType.Default:
-                    // only resend the message whenever a new substantial message is sent 
-                    break;
-                default:
-                    if (args.Message.Reference is not null)
-                        break; // probably a crosspost, continue to repost
-                    return;
-            }
-
-
-            var prelength = stickyMessages.Count;
-            stickyMessages = stickyMessages.DistinctBy(m => m.Id).ToList();
-            // Logger.Put($"Removed {prelength - stickyMessages.Count} duplicates from stickymessages", LogType.Trace);
-
-            Lazy<List<DiscordMessage>> newMessages = new();
-            Lazy<List<DiscordMessage>> deletedStickies = new();
-
-            for (var i = stickyMessages.Count - 1; i >= 0; i--)
-            {
-                var sticky = stickyMessages[i];
-                if (sticky.ChannelId != args.Message.ChannelId)
-                    continue;
-
-                var content = sticky.Content;
-                if (needRecache.Contains(sticky))
-                {
-                    try
-                    {
-                        var updatedMsg = await args.Channel.GetMessageAsync(sticky.Id, true);
-                        content = updatedMsg.Content;
-                    }
-                    catch
-                    {
-                        // failure to fetch new content, it was probably deleted
-                        TryDeleteDontCare(sticky);
-                        stickyMessages.Remove(sticky);
-                        continue;
-                    }
-                }
-
-                // Logger.Put(
-                //     $"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
-                DiscordMessage newMsg;
                 try
                 {
-                    newMsg = await args.Channel.SendMessageAsync(content);
+                    var updatedMsg = await args.Channel.GetMessageAsync(sticky.Id, true);
+                    content = updatedMsg.Content;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Logger.Warn("Failed to send Sticky message: ", ex);
+                    // failure to fetch new content, it was probably deleted
+                    TryDeleteDontCare(sticky);
+                    stickyMessages.Remove(sticky);
                     continue;
                 }
-
-                newMessages.Value.Add(newMsg);
-                stickyMessages.Add(newMsg);
-
-                TryDeleteDontCare(sticky);
-                stickyMessages.Remove(sticky);
-                deletedStickies.Value.Add(sticky);
             }
 
-            if (!newMessages.IsValueCreated)
-                return; // nothing done
-
-            UpdatePersistentData();
-            Logger.Put($"Re-stickied {newMessages.Value.Count} messages (deleted {deletedStickies.Value.Count} msgs)");
-        }
-
-        private static void UpdatePersistentData()
-        {
-            PersistentData.values.stickiedMessages = stickyMessages.Select(m => m.JumpLink.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
-            PersistentData.WritePersistentData();
-        }
-
-        [Command("create")]
-        [Description("Creates a new sticky message in this channel.")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task CreateStickyMessage(
-            SlashCommandContext ctx,
-            [Description("\\n will be replaced with a newline.")]
-            string content)
-        {
-            content = content.Replace("\\n", "\n");
+            // Logger.Put(
+            //     $"Resending sticky message in {args.Channel} w/ content: '{Logger.EnsureShorterThan(content, 50)}'");
+            DiscordMessage newMsg;
             try
             {
-                var newSticky = await ctx.Channel.SendMessageAsync(content);
-                stickyMessages.Add(newSticky);
+                newMsg = await args.Channel.SendMessageAsync(content);
             }
             catch (Exception ex)
             {
-                Logger.Warn("Failed to create new Sticky message: ", ex);
-                await ctx.RespondAsync("Failed to create message!\n" + Logger.EnsureShorterThan(ex.ToString(), 1950), true);
-                return;
+                Logger.Warn("Failed to send Sticky message: ", ex);
+                continue;
             }
 
+            newMessages.Value.Add(newMsg);
+            stickyMessages.Add(newMsg);
 
-            await ctx.RespondAsync("Created message! You should be able to see it!", true);
-            UpdatePersistentData();
+            TryDeleteDontCare(sticky);
+            stickyMessages.Remove(sticky);
+            deletedStickies.Value.Add(sticky);
         }
 
-        [Command("clear")]
-        [Description("Stops any stickied messages in this channel from being re-stickied in the future.")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task ClearStickyMessages(SlashCommandContext ctx)
+        if (!newMessages.IsValueCreated)
+            return; // nothing done
+
+        UpdatePersistentData();
+        Logger.Put($"Re-stickied {newMessages.Value.Count} messages (deleted {deletedStickies.Value.Count} msgs)");
+    }
+
+    private static void UpdatePersistentData()
+    {
+        PersistentData.values.stickiedMessages = stickyMessages.Select(m => m.JumpLink.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        PersistentData.WritePersistentData();
+    }
+
+    [Command("create")]
+    [Description("Creates a new sticky message in this channel.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task CreateStickyMessage(
+        SlashCommandContext ctx,
+        [Description("\\n will be replaced with a newline.")]
+        string content)
+    {
+        content = content.Replace("\\n", "\n");
+        try
         {
-            List<DiscordMessage> removeMessages = [];
-            foreach (var msg in stickyMessages)
-            {
-                if (msg.ChannelId != ctx.Channel.Id)
-                    continue;
-
-                removeMessages.Add(msg);
-            }
-
-            foreach (var msg in removeMessages)
-                stickyMessages.Remove(msg);
-
-
-            await ctx.RespondAsync($"Un-stickied {removeMessages.Count} message(s)", true);
-            UpdatePersistentData();
+            var newSticky = await ctx.Channel.SendMessageAsync(content);
+            stickyMessages.Add(newSticky);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Failed to create new Sticky message: ", ex);
+            await ctx.RespondAsync("Failed to create message!\n" + Logger.EnsureShorterThan(ex.ToString(), 1950), true);
+            return;
         }
 
-        [Command("remove")]
-        [Description("Stops a specific stickied message from being re-stickied in the future.")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
-        {
-            var msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
-            if (msg is null)
-            {
-                await ctx.RespondAsync("Nothing was found from that link lol");
-                return;
-            }
 
+        await ctx.RespondAsync("Created message! You should be able to see it!", true);
+        UpdatePersistentData();
+    }
+
+    [Command("clear")]
+    [Description("Stops any stickied messages in this channel from being re-stickied in the future.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task ClearStickyMessages(SlashCommandContext ctx)
+    {
+        List<DiscordMessage> removeMessages = [];
+        foreach (var msg in stickyMessages)
+        {
+            if (msg.ChannelId != ctx.Channel.Id)
+                continue;
+
+            removeMessages.Add(msg);
+        }
+
+        foreach (var msg in removeMessages)
             stickyMessages.Remove(msg);
 
-            await ctx.RespondAsync("Un-stickied that message!", true);
-            UpdatePersistentData();
-        }
 
+        await ctx.RespondAsync($"Un-stickied {removeMessages.Count} message(s)", true);
+        UpdatePersistentData();
+    }
 
-        [Command("edit")]
-        [Description("Edits a stickied message")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
+    [Command("remove")]
+    [Description("Stops a specific stickied message from being re-stickied in the future.")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task RemoveStickyMessage(SlashCommandContext ctx, string jumpLink)
+    {
+        var msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
+        if (msg is null)
         {
-            var msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
-            if (msg is null)
-            {
-                await ctx.RespondAsync("Nothing was found from that link lol");
-                return;
-            }
-
-            newContent = newContent.Replace("\\n", "\n");
-            try
-            {
-                await msg.ModifyAsync(newContent);
-                needRecache.Add(msg);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Failed to edit Sticky message @ {jumpLink}", ex);
-                await ctx.RespondAsync("Failed to edit message!\n" + Logger.EnsureShorterThan(Formatter.Sanitize(ex.ToString()), 1950), true);
-                return;
-            }
-
-
-            await ctx.RespondAsync("Edited message!", true);
-            UpdatePersistentData();
+            await ctx.RespondAsync("Nothing was found from that link lol");
+            return;
         }
+
+        stickyMessages.Remove(msg);
+
+        await ctx.RespondAsync("Un-stickied that message!", true);
+        UpdatePersistentData();
+    }
+
+
+    [Command("edit")]
+    [Description("Edits a stickied message")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task EditStickyMessage(SlashCommandContext ctx, string jumpLink, string newContent)
+    {
+        var msg = await BoneBot.Bots[ctx.Client].GetMessageFromLink(jumpLink);
+        if (msg is null)
+        {
+            await ctx.RespondAsync("Nothing was found from that link lol");
+            return;
+        }
+
+        newContent = newContent.Replace("\\n", "\n");
+        try
+        {
+            await msg.ModifyAsync(newContent);
+            needRecache.Add(msg);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Failed to edit Sticky message @ {jumpLink}", ex);
+            await ctx.RespondAsync("Failed to edit message!\n" + Logger.EnsureShorterThan(Formatter.Sanitize(ex.ToString()), 1950), true);
+            return;
+        }
+
+
+        await ctx.RespondAsync("Edited message!", true);
+        UpdatePersistentData();
     }
 }

@@ -5,227 +5,226 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 
-namespace BoneBoard.Modules.Blockers
+namespace BoneBoard.Modules.Blockers;
+
+[Command("original")]
+public class BeOriginal(BoneBot bot) : ModuleBase(bot)
 {
-    [Command("original")]
-    public class BeOriginal(BoneBot bot) : ModuleBase(bot)
+    private static readonly DiscordEmoji[] NumberEmojis =
+    [
+        DiscordEmoji.FromUnicode("0️⃣"),
+        DiscordEmoji.FromUnicode("1️⃣"),
+        DiscordEmoji.FromUnicode("2️⃣"),
+        DiscordEmoji.FromUnicode("3️⃣"),
+        DiscordEmoji.FromUnicode("4️⃣"),
+        DiscordEmoji.FromUnicode("5️⃣"),
+        DiscordEmoji.FromUnicode("6️⃣"),
+        DiscordEmoji.FromUnicode("7️⃣"),
+        DiscordEmoji.FromUnicode("8️⃣"),
+        DiscordEmoji.FromUnicode("9️⃣"),
+        DiscordEmoji.FromUnicode("🔟")
+    ];
+
+    private static TimeSpan elapsedTime = TimeSpan.Zero;
+    private static int processedMessages;
+    private static int levDistCounts;
+
+    private readonly Stopwatch sw = new();
+
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
-        private static readonly DiscordEmoji[] NumberEmojis =
-        [
-            DiscordEmoji.FromUnicode("0️⃣"),
-            DiscordEmoji.FromUnicode("1️⃣"),
-            DiscordEmoji.FromUnicode("2️⃣"),
-            DiscordEmoji.FromUnicode("3️⃣"),
-            DiscordEmoji.FromUnicode("4️⃣"),
-            DiscordEmoji.FromUnicode("5️⃣"),
-            DiscordEmoji.FromUnicode("6️⃣"),
-            DiscordEmoji.FromUnicode("7️⃣"),
-            DiscordEmoji.FromUnicode("8️⃣"),
-            DiscordEmoji.FromUnicode("9️⃣"),
-            DiscordEmoji.FromUnicode("🔟")
-        ];
-
-        private static TimeSpan elapsedTime = TimeSpan.Zero;
-        private static int processedMessages;
-        private static int levDistCounts;
-
-        private readonly Stopwatch sw = new();
-
-        protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
         {
-            if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
-            {
-                return MessageCheck(msgCreatedArgs.Message);
-            }
-
-            if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
-            {
-                return MessageCheck(msgUpdatedArgs.Message);
-            }
-
-            return false;
+            return MessageCheck(msgCreatedArgs.Message);
         }
 
-        private bool MessageCheck(DiscordMessage msg)
+        if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            if (bot.IsMe(msg.Author))
-                return false;
+            return MessageCheck(msgUpdatedArgs.Message);
+        }
 
-            if (msg.Timestamp.AddDays(1) < DateTime.Now)
-                return false; // message is old enough to probably not be relevant
+        return false;
+    }
 
-            if (!Config.values.channelsWhereMessagesMustBeOriginal.Contains(msg.ChannelId))
-                return false;
+    private bool MessageCheck(DiscordMessage msg)
+    {
+        if (bot.IsMe(msg.Author))
+            return false;
 
-            if (!PersistentData.values.uniqueChannelsMessages.TryGetValue(msg.ChannelId, out var msgDict))
+        if (msg.Timestamp.AddDays(1) < DateTime.Now)
+            return false; // message is old enough to probably not be relevant
+
+        if (!Config.values.channelsWhereMessagesMustBeOriginal.Contains(msg.ChannelId))
+            return false;
+
+        if (!PersistentData.values.uniqueChannelsMessages.TryGetValue(msg.ChannelId, out var msgDict))
+        {
+            msgDict = [];
+            PersistentData.values.uniqueChannelsMessages[msg.ChannelId] = msgDict;
+        }
+
+        var cleanContent = RegularExpressions.Link.Replace(msg.Content.ToLower(), "<link>");
+        // intentional choice to not let links slip through the cracks
+        // if (cleanContent == "<link>")
+        //     return false;
+
+        cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<mention>");
+        cleanContent = RegularExpressions.WhitespaceIsh.Replace(cleanContent, " ");
+
+        var requiredLevDist = Config.values.originalityMinLevDist +
+                              (int)(Config.values.originalityLevDistScale * cleanContent.Length);
+        var minSeenLevDist = Config.values.isOriginalityInDryRun ? 1024 : requiredLevDist + 1;
+        var minLevDistStr = "<None>";
+        var levDistCalcs = 0;
+
+        sw.Restart();
+
+        foreach (var kvp in msgDict)
+        {
+            if (msg.Id == kvp.Key)
+                continue;
+
+            // The lev dist isn't going to be lowered by a string with a difference in length greater
+            // than the currently found smallest lev dist
+            if (Math.Abs(kvp.Value.Length - cleanContent.Length) > minSeenLevDist)
+                continue;
+
+            var newLevDist = cleanContent.LevenshteinDistance(kvp.Value);
+            levDistCalcs++;
+
+            if (newLevDist < minSeenLevDist)
             {
-                msgDict = [];
-                PersistentData.values.uniqueChannelsMessages[msg.ChannelId] = msgDict;
+                Logger.Put($"Found a new min dist of {newLevDist} between [[{cleanContent}]] and [[{kvp.Value}]]", LogType.Debug);
+                minSeenLevDist = newLevDist;
+                minLevDistStr = kvp.Value;
             }
+        }
 
-            var cleanContent = RegularExpressions.Link.Replace(msg.Content.ToLower(), "<link>");
-            // intentional choice to not let links slip through the cracks
-            // if (cleanContent == "<link>")
-            //     return false;
+        sw.Stop();
+        levDistCounts += levDistCalcs;
+        elapsedTime += sw.Elapsed;
+        processedMessages++;
+        Logger.Put($"Found lev dist {minSeenLevDist} between string [[{cleanContent}]] (message) " +
+                   $"and [[{minLevDistStr}]] (historical, of {msgDict.Count} past strings) " +
+                   $"in {sw.ElapsedMilliseconds}ms ({levDistCalcs} ld calculations)", LogType.Debug);
 
-            cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<mention>");
-            cleanContent = RegularExpressions.WhitespaceIsh.Replace(cleanContent, " ");
 
-            var requiredLevDist = Config.values.originalityMinLevDist +
-                                  (int)(Config.values.originalityLevDistScale * cleanContent.Length);
-            var minSeenLevDist = Config.values.isOriginalityInDryRun ? 1024 : requiredLevDist + 1;
-            var minLevDistStr = "<None>";
-            var levDistCalcs = 0;
+        msgDict[msg.Id] = cleanContent;
+        PersistentData.WritePersistentData();
 
-            sw.Restart();
-
-            foreach (var kvp in msgDict)
+        if (Config.values.isOriginalityInDryRun)
+        {
+            // num exists in NumberEmojis array & a comparison was made
+            if (minSeenLevDist < NumberEmojis.Length && levDistCounts != 0)
             {
-                if (msg.Id == kvp.Key)
-                    continue;
-
-                // The lev dist isn't going to be lowered by a string with a difference in length greater
-                // than the currently found smallest lev dist
-                if (Math.Abs(kvp.Value.Length - cleanContent.Length) > minSeenLevDist)
-                    continue;
-
-                var newLevDist = cleanContent.LevenshteinDistance(kvp.Value);
-                levDistCalcs++;
-
-                if (newLevDist < minSeenLevDist)
-                {
-                    Logger.Put($"Found a new min dist of {newLevDist} between [[{cleanContent}]] and [[{kvp.Value}]]", LogType.Debug);
-                    minSeenLevDist = newLevDist;
-                    minLevDistStr = kvp.Value;
-                }
+                _ = TryReact(msg, NumberEmojis[minSeenLevDist]);
             }
+        }
 
-            sw.Stop();
-            levDistCounts += levDistCalcs;
-            elapsedTime += sw.Elapsed;
-            processedMessages++;
-            Logger.Put($"Found lev dist {minSeenLevDist} between string [[{cleanContent}]] (message) " +
-                       $"and [[{minLevDistStr}]] (historical, of {msgDict.Count} past strings) " +
-                       $"in {sw.ElapsedMilliseconds}ms ({levDistCalcs} ld calculations)", LogType.Debug);
-
-
-            msgDict[msg.Id] = cleanContent;
-            PersistentData.WritePersistentData();
-
+        // There are more differences than the allowed amount
+        if (minSeenLevDist < requiredLevDist)
+        {
             if (Config.values.isOriginalityInDryRun)
             {
-                // num exists in NumberEmojis array & a comparison was made
-                if (minSeenLevDist < NumberEmojis.Length && levDistCounts != 0)
-                {
-                    _ = TryReact(msg, NumberEmojis[minSeenLevDist]);
-                }
+                // down react instead of deleting
+                _ = TryReact(msg, DiscordEmoji.FromUnicode("👎"));
             }
-
-            // There are more differences than the allowed amount
-            if (minSeenLevDist < requiredLevDist)
+            else
             {
-                if (Config.values.isOriginalityInDryRun)
-                {
-                    // down react instead of deleting
-                    _ = TryReact(msg, DiscordEmoji.FromUnicode("👎"));
-                }
-                else
-                {
-                    TryDeleteDontCare(msg, $"Lev dist of {minSeenLevDist} is lesser than the allowed {requiredLevDist} " +
-                                           $"({Config.values.originalityMinLevDist} min + ({Config.values.originalityLevDistScale} scale * {cleanContent.Length} content len) ).");
+                TryDeleteDontCare(msg, $"Lev dist of {minSeenLevDist} is lesser than the allowed {requiredLevDist} " +
+                                       $"({Config.values.originalityMinLevDist} min + ({Config.values.originalityLevDistScale} scale * {cleanContent.Length} content len) ).");
 
-                    ProcObituaryFor(msg);
-                }
-
-                return true;
+                ProcObituaryFor(msg);
             }
 
-
-            return false;
+            return true;
         }
 
-        private void ProcObituaryFor(DiscordMessage msg)
+
+        return false;
+    }
+
+    private void ProcObituaryFor(DiscordMessage msg)
+    {
+        if (!Config.values.sendObituaryWhenDeletingUnoriginalMessage || msg.Author is null)
+            return;
+
+        if (!PersistentData.values.lastUnoriginalObituaryTimes.TryGetValue(msg.ChannelId, out var userDict))
         {
-            if (!Config.values.sendObituaryWhenDeletingUnoriginalMessage || msg.Author is null)
+            userDict = [];
+            PersistentData.values.lastUnoriginalObituaryTimes[msg.ChannelId] = userDict;
+        }
+
+        if (userDict.TryGetValue(msg.Author.Id, out var lastObituaryTime) // has had an obituary before
+            && DateTime.Now - lastObituaryTime <
+            TimeSpan.FromHours(Config.values.unoriginalObituaryCooldownHrs)) // time between last obit and now is less than the set num of hours 
+        {
+            Logger.Put($"Not sending obituary for {msg.Author} - they got one {(DateTime.Now - lastObituaryTime).TotalHours:0.0} hrs ago", LogType.Debug);
+            return;
+        }
+
+        Task.Run(async () =>
+        {
+            if (msg.Channel is null)
                 return;
 
-            if (!PersistentData.values.lastUnoriginalObituaryTimes.TryGetValue(msg.ChannelId, out var userDict))
-            {
-                userDict = [];
-                PersistentData.values.lastUnoriginalObituaryTimes[msg.ChannelId] = userDict;
-            }
+            var footer = $"A bastion of unoriginality since {msg.Author.CreationTimestamp.Year}";
+            if (RegularExpressions.Link.Replace(msg.Content, "").Length == 0)
+                footer = $"A bastion of unoriginal stoicism since {msg.Author.CreationTimestamp.Year}";
 
-            if (userDict.TryGetValue(msg.Author.Id, out var lastObituaryTime) // has had an obituary before
-                && DateTime.Now - lastObituaryTime <
-                TimeSpan.FromHours(Config.values.unoriginalObituaryCooldownHrs)) // time between last obit and now is less than the set num of hours 
-            {
-                Logger.Put($"Not sending obituary for {msg.Author} - they got one {(DateTime.Now - lastObituaryTime).TotalHours:0.0} hrs ago", LogType.Debug);
+            var img = await Quoter.Obituary(msg, bot.client, footer);
+            if (img is null)
                 return;
-            }
 
-            Task.Run(async () =>
+            using var ms = new MemoryStream();
+            await img.SaveAsJpegAsync(ms, new JpegEncoder { Quality = 90 });
+            ms.Seek(0, SeekOrigin.Begin); // reset stream pos
+
+            var dmb = new DiscordMessageBuilder()
+                .AddFile("rip.png", ms, AddFileOptions.CopyStream);
+            Logger.Put($"Sending obituary message for msg {msg}", LogType.Debug);
+            var obituaryMessage = await msg.Channel.SendMessageAsync(dmb);
+
+            if (Config.values.unoriginalObituaryDeleteTimeMinutes != 0)
             {
-                if (msg.Channel is null)
-                    return;
+                _ = Task.Delay(TimeSpan.FromMinutes(Config.values.unoriginalObituaryDeleteTimeMinutes))
+                    .ContinueWith(_ => TryDeleteDontCare(obituaryMessage));
+            }
+        });
+    }
 
-                var footer = $"A bastion of unoriginality since {msg.Author.CreationTimestamp.Year}";
-                if (RegularExpressions.Link.Replace(msg.Content, "").Length == 0)
-                    footer = $"A bastion of unoriginal stoicism since {msg.Author.CreationTimestamp.Year}";
+    [Command("toggleDryRun")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task SetDryRun(SlashCommandContext ctx, bool newValue)
+    {
+        var oldValue = Config.values.isOriginalityInDryRun;
+        Config.values.isOriginalityInDryRun = newValue;
+        await ctx.RespondAsync($"Got it, dry runs are now {(newValue ? "active" : "inactive")} " +
+                               $"(formerly {(oldValue ? "active" : "inactive")})", true);
+        Config.WriteConfig();
+    }
 
-                var img = await Quoter.Obituary(msg, bot.client, footer);
-                if (img is null)
-                    return;
+    [Command("setLevDist")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    [RequireApplicationOwner]
+    public static async Task SetLevDist(SlashCommandContext ctx, int newValue = 4, double scale = 0.2)
+    {
+        var oldMin = Config.values.originalityMinLevDist;
+        var oldScale = Config.values.originalityLevDistScale;
+        Config.values.originalityMinLevDist = newValue;
+        Config.values.originalityLevDistScale = scale;
+        await ctx.RespondAsync($"Got it, messages are now considered reused if a lev dist of {newValue}+(length * {scale}) is found.\n" +
+                               $"(read: appx that # of characters must get changed the new msg and an older one)\n" +
+                               $"(value was formerly {oldMin}, w scale of {oldScale})", true);
+        Config.WriteConfig();
+    }
 
-                using var ms = new MemoryStream();
-                await img.SaveAsJpegAsync(ms, new JpegEncoder { Quality = 90 });
-                ms.Seek(0, SeekOrigin.Begin); // reset stream pos
-
-                var dmb = new DiscordMessageBuilder()
-                    .AddFile("rip.png", ms, AddFileOptions.CopyStream);
-                Logger.Put($"Sending obituary message for msg {msg}", LogType.Debug);
-                var obituaryMessage = await msg.Channel.SendMessageAsync(dmb);
-
-                if (Config.values.unoriginalObituaryDeleteTimeMinutes != 0)
-                {
-                    _ = Task.Delay(TimeSpan.FromMinutes(Config.values.unoriginalObituaryDeleteTimeMinutes))
-                        .ContinueWith(_ => TryDeleteDontCare(obituaryMessage));
-                }
-            });
-        }
-
-        [Command("toggleDryRun")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task SetDryRun(SlashCommandContext ctx, bool newValue)
-        {
-            var oldValue = Config.values.isOriginalityInDryRun;
-            Config.values.isOriginalityInDryRun = newValue;
-            await ctx.RespondAsync($"Got it, dry runs are now {(newValue ? "active" : "inactive")} " +
-                                   $"(formerly {(oldValue ? "active" : "inactive")})", true);
-            Config.WriteConfig();
-        }
-
-        [Command("setLevDist")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        [RequireApplicationOwner]
-        public static async Task SetLevDist(SlashCommandContext ctx, int newValue = 4, double scale = 0.2)
-        {
-            var oldMin = Config.values.originalityMinLevDist;
-            var oldScale = Config.values.originalityLevDistScale;
-            Config.values.originalityMinLevDist = newValue;
-            Config.values.originalityLevDistScale = scale;
-            await ctx.RespondAsync($"Got it, messages are now considered reused if a lev dist of {newValue}+(length * {scale}) is found.\n" +
-                                   $"(read: appx that # of characters must get changed the new msg and an older one)\n" +
-                                   $"(value was formerly {oldMin}, w scale of {oldScale})", true);
-            Config.WriteConfig();
-        }
-
-        [Command("getTimingInfo")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task SetDryRun(SlashCommandContext ctx)
-        {
-            await ctx.RespondAsync($"Processed {processedMessages} messages over a combined {elapsedTime.TotalSeconds:0.00} seconds.\n" +
-                                   $"This involved {levDistCounts} ({levDistCounts / 1000.0:0.0}K) levenshtein distance calculations, " +
-                                   $"representing an average of {processedMessages / (double)levDistCounts} calculations per message.", true);
-        }
+    [Command("getTimingInfo")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task SetDryRun(SlashCommandContext ctx)
+    {
+        await ctx.RespondAsync($"Processed {processedMessages} messages over a combined {elapsedTime.TotalSeconds:0.00} seconds.\n" +
+                               $"This involved {levDistCounts} ({levDistCounts / 1000.0:0.0}K) levenshtein distance calculations, " +
+                               $"representing an average of {processedMessages / (double)levDistCounts} calculations per message.", true);
     }
 }

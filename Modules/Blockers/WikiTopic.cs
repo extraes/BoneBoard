@@ -10,292 +10,291 @@ using WikiClientLibrary.Generators;
 using WikiClientLibrary.Pages;
 using WikiClientLibrary.Sites;
 
-namespace BoneBoard.Modules.Blockers
+namespace BoneBoard.Modules.Blockers;
+
+[AllowedProcessors(typeof(SlashCommandProcessor))]
+[Command("wikitopic")]
+internal partial class WikiTopic : ModuleBase
 {
-    [AllowedProcessors(typeof(SlashCommandProcessor))]
-    [Command("wikitopic")]
-    internal partial class WikiTopic : ModuleBase
+    private const int HOURS_PER_TOPIC_CHANGE = 4;
+    private readonly Dictionary<ulong, DiscordMessage> statusMessages = new();
+    private readonly Dictionary<ulong, string> whyAUsersMessageWasDeleted = new();
+    private CancellationTokenSource topicRollover = new();
+    private string? topicStr;
+    private WikiClient? wikiClint;
+
+    public WikiTopic(BoneBot bot) : base(bot)
     {
-        private const int HOURS_PER_TOPIC_CHANGE = 4;
-        private readonly Dictionary<ulong, DiscordMessage> statusMessages = new();
-        private readonly Dictionary<ulong, string> whyAUsersMessageWasDeleted = new();
-        private CancellationTokenSource topicRollover = new();
-        private string? topicStr;
-        private WikiClient? wikiClint;
-
-        public WikiTopic(BoneBot bot) : base(bot)
+        Config.ConfigChanged += () =>
         {
-            Config.ConfigChanged += () =>
-            {
-                wikiClint = null;
-                topicStr = null;
-            };
+            wikiClint = null;
+            topicStr = null;
+        };
+    }
+
+    protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
+    {
+        var isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) < DateTime.Now;
+        if (isTopicStale || string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
+            await SetNewTopic();
+        else if (string.IsNullOrWhiteSpace(topicStr) && !string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
+        {
+            var saved = PersistentData.values.lastTopicSwitchTime;
+            await SetNewTopic(PersistentData.values.currentWikiTopic, false);
+            PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer when starting up
         }
 
-        protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
+        TopicRolloverLoop(topicRollover.Token);
+    }
+
+    private void RestartRollover()
+    {
+        topicRollover.Cancel();
+        topicRollover = new CancellationTokenSource();
+        TopicRolloverLoop(topicRollover.Token);
+    }
+
+    private async void TopicRolloverLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
         {
-            var isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) < DateTime.Now;
-            if (isTopicStale || string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
-                await SetNewTopic();
-            else if (string.IsNullOrWhiteSpace(topicStr) && !string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
+            var timeToWait = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) - DateTime.Now;
+            // check every 60sec for a channel to be set in case one gets set while running 
+            if (timeToWait.TotalMilliseconds <= 0)
             {
-                var saved = PersistentData.values.lastTopicSwitchTime;
-                await SetNewTopic(PersistentData.values.currentWikiTopic, false);
-                PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer when starting up
+                timeToWait = TimeSpan.FromMinutes(1);
             }
 
-            TopicRolloverLoop(topicRollover.Token);
+            try
+            {
+                await Task.Delay(timeToWait, token);
+            }
+            catch
+            {
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                Logger.Put("Topic rollover cancelled! Presumably a new loop has started up? Hopefully at least!");
+                return;
+            }
+
+            await SetNewTopic();
+        }
+    }
+
+    protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+    {
+        if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
+        {
+            _ = MessageCheckAsync(msgCreatedArgs.Message, eventArgs);
         }
 
-        private void RestartRollover()
+        if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
         {
-            topicRollover.Cancel();
-            topicRollover = new CancellationTokenSource();
-            TopicRolloverLoop(topicRollover.Token);
+            _ = MessageCheckAsync(msgUpdatedArgs.Message, eventArgs);
         }
 
-        private async void TopicRolloverLoop(CancellationToken token)
+        return false;
+    }
+
+    private async Task<bool> MessageCheckAsync(DiscordMessage msg, DiscordEventArgs args)
+    {
+        if (bot.IsMe(msg.Author) || msg.Author is null)
+            return false;
+        if (!Config.values.channelsWhereMessagesMustBeOnTopic.Contains(msg.ChannelId))
+            return false;
+        if (msg.Timestamp.AddDays(1) < DateTime.Now)
+            return false; // message is old enough to probably not be relevant
+
+
+        var content = msg.Content;
+        if (msg.Reference?.Type == DiscordMessageReferenceType.Forward && (msg.MessageSnapshots?.Count ?? 0) > 0)
+            content = string.Join('\n', msg.MessageSnapshots!.Select(m => m.Message.Content));
+        if (content.Length == 0)
+            return false;
+        if (string.IsNullOrWhiteSpace(topicStr))
         {
-            while (!token.IsCancellationRequested)
-            {
-                var timeToWait = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) - DateTime.Now;
-                // check every 60sec for a channel to be set in case one gets set while running 
-                if (timeToWait.TotalMilliseconds <= 0)
-                {
-                    timeToWait = TimeSpan.FromMinutes(1);
-                }
-
-                try
-                {
-                    await Task.Delay(timeToWait, token);
-                }
-                catch
-                {
-                }
-
-                if (token.IsCancellationRequested)
-                {
-                    Logger.Put("Topic rollover cancelled! Presumably a new loop has started up? Hopefully at least!");
-                    return;
-                }
-
-                await SetNewTopic();
-            }
+            if (string.IsNullOrWhiteSpace(PersistentData.values.currentWikiTopic))
+                return false;
+            var saved = PersistentData.values.lastTopicSwitchTime;
+            await SetNewTopic(PersistentData.values.currentWikiTopic);
+            PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer just bc someone sent a message
         }
 
-        protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
+        if (topicStr is null)
         {
-            if (eventArgs is MessageCreatedEventArgs msgCreatedArgs)
-            {
-                _ = MessageCheckAsync(msgCreatedArgs.Message, eventArgs);
-            }
-
-            if (eventArgs is MessageUpdatedEventArgs msgUpdatedArgs)
-            {
-                _ = MessageCheckAsync(msgUpdatedArgs.Message, eventArgs);
-            }
-
+            Logger.Warn("No topic currently set!");
             return false;
         }
 
-        private async Task<bool> MessageCheckAsync(DiscordMessage msg, DiscordEventArgs args)
-        {
-            if (bot.IsMe(msg.Author) || msg.Author is null)
-                return false;
-            if (!Config.values.channelsWhereMessagesMustBeOnTopic.Contains(msg.ChannelId))
-                return false;
-            if (msg.Timestamp.AddDays(1) < DateTime.Now)
-                return false; // message is old enough to probably not be relevant
+        var cleanContent = Formatter.Strip(content);
 
-
-            var content = msg.Content;
-            if (msg.Reference?.Type == DiscordMessageReferenceType.Forward && (msg.MessageSnapshots?.Count ?? 0) > 0)
-                content = string.Join('\n', msg.MessageSnapshots!.Select(m => m.Message.Content));
-            if (content.Length == 0)
-                return false;
-            if (string.IsNullOrWhiteSpace(topicStr))
-            {
-                if (string.IsNullOrWhiteSpace(PersistentData.values.currentWikiTopic))
-                    return false;
-                var saved = PersistentData.values.lastTopicSwitchTime;
-                await SetNewTopic(PersistentData.values.currentWikiTopic);
-                PersistentData.values.lastTopicSwitchTime = saved; // dont reset the timer just bc someone sent a message
-            }
-
-            if (topicStr is null)
-            {
-                Logger.Warn("No topic currently set!");
-                return false;
-            }
-
-            var cleanContent = Formatter.Strip(content);
-
-            var clint = bot.OpenAI.Value;
-            if (clint is null)
-                return false;
-
-            var chatClint = clint.GetChatClient(Config.values.wikiTopicModel);
-            var messages = new ChatMessage[]
-            {
-                ChatMessage.CreateSystemMessage(Config.values.wikiTopicSystemPrompt),
-                ChatMessage.CreateUserMessage(topicStr),
-                ChatMessage.CreateUserMessage(cleanContent)
-            };
-            var res = await chatClint.CompleteChatAsync(messages);
-
-            foreach (var part in res.Value.Content)
-            {
-                if (part.Text.Contains("\"on_topic\": false"))
-                {
-                    Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", LogType.Normal,
-                        false);
-                    whyAUsersMessageWasDeleted[msg.Author.Id] = $"Beamed for the following:```\n{content.Replace("```", "'''")}```{part.Text}";
-                    await TryDeleteAsync(msg, "Off topic");
-                    DontPropagateEvent(args);
-                    return true;
-                }
-            }
-
+        var clint = bot.OpenAI.Value;
+        if (clint is null)
             return false;
+
+        var chatClint = clint.GetChatClient(Config.values.wikiTopicModel);
+        var messages = new ChatMessage[]
+        {
+            ChatMessage.CreateSystemMessage(Config.values.wikiTopicSystemPrompt),
+            ChatMessage.CreateUserMessage(topicStr),
+            ChatMessage.CreateUserMessage(cleanContent)
+        };
+        var res = await chatClint.CompleteChatAsync(messages);
+
+        foreach (var part in res.Value.Content)
+        {
+            if (part.Text.Contains("\"on_topic\": false"))
+            {
+                Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", LogType.Normal,
+                    false);
+                whyAUsersMessageWasDeleted[msg.Author.Id] = $"Beamed for the following:```\n{content.Replace("```", "'''")}```{part.Text}";
+                await TryDeleteAsync(msg, "Off topic");
+                DontPropagateEvent(args);
+                return true;
+            }
         }
 
+        return false;
+    }
 
-        private async Task SetNewTopic(string? articleTitle = null, bool sendNewMessage = true)
+
+    private async Task SetNewTopic(string? articleTitle = null, bool sendNewMessage = true)
+    {
+        if (Config.values.channelsWhereMessagesMustBeOnTopic.Count == 0)
         {
-            if (Config.values.channelsWhereMessagesMustBeOnTopic.Count == 0)
-            {
-                // Logger.Warn("No channels configured for wiki topic enforcement, skipping topic set");
-                return;
-            }
+            // Logger.Warn("No channels configured for wiki topic enforcement, skipping topic set");
+            return;
+        }
 
-            wikiClint ??= new WikiClient
-            {
-                ClientUserAgent = "boneboard/1.0"
-            };
+        wikiClint ??= new WikiClient
+        {
+            ClientUserAgent = "boneboard/1.0"
+        };
 
-            var site = new WikiSite(wikiClint, "https://en.wikipedia.org/w/api.php");
-            await site.Initialization;
-            WikiPage? page = null;
-            if (articleTitle is not null)
+        var site = new WikiSite(wikiClint, "https://en.wikipedia.org/w/api.php");
+        await site.Initialization;
+        WikiPage? page = null;
+        if (articleTitle is not null)
+        {
+            page = new WikiPage(site, articleTitle);
+            await page.RefreshAsync(PageQueryOptions.FetchContent);
+        }
+        else
+        {
+            var needReroll = true;
+            while (page is null || needReroll)
             {
-                page = new WikiPage(site, articleTitle);
-                await page.RefreshAsync(PageQueryOptions.FetchContent);
-            }
-            else
-            {
-                var needReroll = true;
-                while (page is null || needReroll)
+                var pageGen = new RecentChangesGenerator(site)
                 {
-                    var pageGen = new RecentChangesGenerator(site)
+                    NamespaceIds = [BuiltInNamespaces.Main]
+                };
+                await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
+                {
+                    Logger.Put($"\"Random\" (recently edited, lol) wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
+
+                    var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", randomPage.Title!,
+                        DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
+
+                    var sum = views?.items.Sum(i => i.views) ?? -1;
+                    if (sum == -1)
+                        continue;
+                    Logger.Put($"Wiki topic '{randomPage.Title}' view count in past 30 days: {sum}");
+                    needReroll = sum < Config.values.wikiTopicMinMonthlyViews;
+                    needReroll |= (randomPage.Content?.Length ?? int.MaxValue) > Config.values.wikiTopicMaxLengthChars;
+
+                    if (!needReroll)
                     {
-                        NamespaceIds = [BuiltInNamespaces.Main]
-                    };
-                    await foreach (var randomPage in pageGen.EnumPagesAsync(PageQueryOptions.FetchContent))
-                    {
-                        Logger.Put($"\"Random\" (recently edited, lol) wiki topic selected: {randomPage.Title} (Namespace id {randomPage.NamespaceId})");
-
-                        var views = await GetArticlePageviewsAsync(wikiClint, "en.wikipedia.org", randomPage.Title!,
-                            DateOnly.FromDateTime(DateTime.Now.AddDays(-30)), DateOnly.FromDateTime(DateTime.Now));
-
-                        var sum = views?.items.Sum(i => i.views) ?? -1;
-                        if (sum == -1)
-                            continue;
-                        Logger.Put($"Wiki topic '{randomPage.Title}' view count in past 30 days: {sum}");
-                        needReroll = sum < Config.values.wikiTopicMinMonthlyViews;
-                        needReroll |= (randomPage.Content?.Length ?? int.MaxValue) > Config.values.wikiTopicMaxLengthChars;
-
-                        if (!needReroll)
-                        {
-                            page = randomPage;
-                            break;
-                        }
-
-                        Logger.Put($"Rerolling wiki topic (views {sum}, length {randomPage.Content?.Length ?? -1})");
+                        page = randomPage;
+                        break;
                     }
 
-                    if (page is null)
-                    {
-                        await Task.Delay(250); // give the world some time to edit more pages, lol
-                    }
+                    Logger.Put($"Rerolling wiki topic (views {sum}, length {randomPage.Content?.Length ?? -1})");
                 }
-            }
 
-            PersistentData.values.lastTopicSwitchTime = DateTime.Now;
-            Logger.Put($"Settled on wiki topic {page.Title} ({page.Content?.Length ?? -1} char long)");
-            topicStr = page.Content;
-            PersistentData.values.currentWikiTopic = page.Title ?? "";
-            if (sendNewMessage)
-            {
-                foreach (var channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
+                if (page is null)
                 {
-                    Logger.Put($"Posting new topic message in channel {channelId}");
-                    var channel = await bot.client.GetChannelAsync(channelId);
-                    var sentMsg = await channel.SendMessageAsync(
-                        $"New topic!!! better read up on [{page.Title}](https://en.wikipedia.org/wiki/{Uri.EscapeDataString(page.Title!)}) {Formatter.Timestamp(TimeSpan.FromHours(HOURS_PER_TOPIC_CHANGE))}");
-                    statusMessages[channelId] = sentMsg;
-                    PersistentData.values.wikiTopicAnnounceMessages[channelId] = sentMsg.Id;
+                    await Task.Delay(250); // give the world some time to edit more pages, lol
                 }
             }
-
-            PersistentData.WritePersistentData();
-            Logger.Put("Successfully changed wiki topic");
         }
 
-        [Command("set")]
-        [Description("Set the topic for the next few hours (until the next topic switch should occur)")]
-        [RequirePermissions([], [DiscordPermission.ManageMessages])]
-        public static async Task SetTopic(
-            SlashCommandContext ctx,
-            [Parameter("articleTitle")] string? articleTitle = null)
+        PersistentData.values.lastTopicSwitchTime = DateTime.Now;
+        Logger.Put($"Settled on wiki topic {page.Title} ({page.Content?.Length ?? -1} char long)");
+        topicStr = page.Content;
+        PersistentData.values.currentWikiTopic = page.Title ?? "";
+        if (sendNewMessage)
         {
-            await ctx.DeferResponseAsync(true);
-            var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
-            if (wikitopic is null)
+            foreach (var channelId in Config.values.channelsWhereMessagesMustBeOnTopic)
             {
-                await ctx.FollowupAsync(
-                    "uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
-                return;
+                Logger.Put($"Posting new topic message in channel {channelId}");
+                var channel = await bot.client.GetChannelAsync(channelId);
+                var sentMsg = await channel.SendMessageAsync(
+                    $"New topic!!! better read up on [{page.Title}](https://en.wikipedia.org/wiki/{Uri.EscapeDataString(page.Title!)}) {Formatter.Timestamp(TimeSpan.FromHours(HOURS_PER_TOPIC_CHANGE))}");
+                statusMessages[channelId] = sentMsg;
+                PersistentData.values.wikiTopicAnnounceMessages[channelId] = sentMsg.Id;
             }
-
-            wikitopic.RestartRollover();
-            await wikitopic.SetNewTopic(articleTitle);
-            await ctx.FollowupAsync("Changed wiki topic!");
         }
 
-        [Command("ermmmmmMods")]
-        [Description("@extraes WHY WAS MY MESSAGE DELETED I WAS ON TOPIC")]
-        [RequireGuild]
-        public static async Task AntiWhine(SlashCommandContext ctx,
-            [Parameter("otherUser")] [Description("Only usable if you're a moderator")]
-            DiscordUser? target = null)
+        PersistentData.WritePersistentData();
+        Logger.Put("Successfully changed wiki topic");
+    }
+
+    [Command("set")]
+    [Description("Set the topic for the next few hours (until the next topic switch should occur)")]
+    [RequirePermissions([], [DiscordPermission.ManageMessages])]
+    public static async Task SetTopic(
+        SlashCommandContext ctx,
+        [Parameter("articleTitle")] string? articleTitle = null)
+    {
+        await ctx.DeferResponseAsync(true);
+        var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
+        if (wikitopic is null)
         {
-            var isMod = ctx.Member is not null
-                        && ctx.Channel.PermissionsFor(ctx.Member).HasPermission(DiscordPermission.ManageMessages);
-            if (target != null && !isMod)
-            {
-                await ctx.RespondAsync("I said,\n# only usable if you're a moderator\nand you're not.", true);
-                return;
-            }
-
-            target ??= ctx.User;
-
-            await ctx.DeferResponseAsync(true);
-
-            var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
-            if (wikitopic is null)
-            {
-                await ctx.FollowupAsync(
-                    "uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
-                return;
-            }
-
-            if (wikitopic.whyAUsersMessageWasDeleted.TryGetValue(target.Id, out var reason))
-            {
-                await ctx.FollowupAsync(reason);
-                return;
-            }
-
-            await ctx.FollowupAsync("nothing was found for you, get beamed");
+            await ctx.FollowupAsync(
+                "uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
+            return;
         }
+
+        wikitopic.RestartRollover();
+        await wikitopic.SetNewTopic(articleTitle);
+        await ctx.FollowupAsync("Changed wiki topic!");
+    }
+
+    [Command("ermmmmmMods")]
+    [Description("@extraes WHY WAS MY MESSAGE DELETED I WAS ON TOPIC")]
+    [RequireGuild]
+    public static async Task AntiWhine(SlashCommandContext ctx,
+        [Parameter("otherUser")] [Description("Only usable if you're a moderator")]
+        DiscordUser? target = null)
+    {
+        var isMod = ctx.Member is not null
+                    && ctx.Channel.PermissionsFor(ctx.Member).HasPermission(DiscordPermission.ManageMessages);
+        if (target != null && !isMod)
+        {
+            await ctx.RespondAsync("I said,\n# only usable if you're a moderator\nand you're not.", true);
+            return;
+        }
+
+        target ??= ctx.User;
+
+        await ctx.DeferResponseAsync(true);
+
+        var wikitopic = (WikiTopic?)ctx.ServiceProvider.GetService(typeof(WikiTopic));
+        if (wikitopic is null)
+        {
+            await ctx.FollowupAsync(
+                "uhhhhh check for sum error or some shit in the log bc i cant find where the topic module is... uhhhhhhhhhhhhhh good luck man");
+            return;
+        }
+
+        if (wikitopic.whyAUsersMessageWasDeleted.TryGetValue(target.Id, out var reason))
+        {
+            await ctx.FollowupAsync(reason);
+            return;
+        }
+
+        await ctx.FollowupAsync("nothing was found for you, get beamed");
     }
 }

@@ -1,8 +1,7 @@
-﻿namespace BoneBoard
+﻿namespace BoneBoard;
+
+public enum FrogRoleLimitation
 {
-    public enum FrogRoleLimitation
-    {
-        NONE = 0,
-        DAY_OF_WEEK = 1 << 0
-    }
+    NONE = 0,
+    DAY_OF_WEEK = 1 << 0
 }
