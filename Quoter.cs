@@ -50,7 +50,7 @@ internal static partial class Quoter
             return null;
         }
         string name = member.DisplayName;
-        string quoteText = overrideQuote ?? QuickCleanContent(msg, clint, msg.Channel?.Guild);
+        string quoteText = overrideQuote ?? TextThings.QuickCleanContent(msg, clint, msg.Channel?.Guild);
 
         const int PFP_IMAGE_SIZE = 512;
 
@@ -121,11 +121,11 @@ internal static partial class Quoter
                 name = "Anonymous confessor";
         }
 
-        MatchEvaluator userMentionEvaluator = new(match => ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
-        cleanContent = RegularExpressions.UserMention.Replace(startingContent, userMentionEvaluator);
+        MatchEvaluator userMentionEvaluator = new(match => TextThings.ReplaceIdWithUser(match, clint, global ? msg.Channel.Guild : null));
+        cleanContent = TextThings.UserMention.Replace(startingContent, userMentionEvaluator);
 
-        MatchEvaluator channelMentionEvaluator = new(match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
-        cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, channelMentionEvaluator);
+        MatchEvaluator channelMentionEvaluator = new(match => TextThings.ReplaceIdWithChannel(match, clint, msg.Channel?.Guild));
+        cleanContent = TextThings.ChannelMention.Replace(cleanContent, channelMentionEvaluator);
 
         if (msg.Attachments.Any()) mediaThumb = msg.Attachments[0].Url;
 
@@ -173,7 +173,7 @@ internal static partial class Quoter
         {
             try
             {
-                cleanContent = RegularExpressions.Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
+                cleanContent = TextThings.Link.Replace(cleanContent.Replace(mediaThumb, ""), "<Link>");
 
                 if (cleanContent == "<Link>")
                     cleanContent = "";
@@ -191,7 +191,7 @@ internal static partial class Quoter
         List<Match> customEmojis = MatchedCustomEmojis;
         customEmojis.Clear();
         MatchEvaluator emojiMentionEvaluator = match => { customEmojis.Add(match); return CUSTOM_EMOJI_SUBSTITUTE; };
-        cleanContent = RegularExpressions.CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
+        cleanContent = TextThings.CustomEmoji.Replace(cleanContent, emojiMentionEvaluator);
 
         if (string.IsNullOrWhiteSpace(cleanContent) && media is null)
             subtext = "So true...";
@@ -317,105 +317,6 @@ internal static partial class Quoter
             yield return idx;
             idx++;
         }
-    }
-
-    [SuppressMessage("ReSharper", "ConvertToLocalFunction")]
-    private static string QuickCleanContent(DiscordMessage msg, DiscordClient clint, DiscordGuild? guild)
-    {
-        string cleanContent = msg.Content;
-        MatchEvaluator userMentionEvaluator = match => ReplaceIdWithUser(match, clint, guild);
-        cleanContent = RegularExpressions.UserMention.Replace(cleanContent, userMentionEvaluator);
-
-        MatchEvaluator channelMentionEvaluator = match => ReplaceIdWithChannel(match, clint, msg.Channel?.Guild);
-        cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, channelMentionEvaluator);
-        
-        MatchEvaluator roleMentionEvaluator = match => ReplaceIdWithRole(match, clint, guild);
-        cleanContent = RegularExpressions.RoleMention.Replace(cleanContent, roleMentionEvaluator);
-
-        cleanContent = RegularExpressions.CustomEmoji.Replace(cleanContent, ":$1:");
-
-        cleanContent = RegularExpressions.Link.Replace(cleanContent, "<Link>");
-
-        if (cleanContent == "<Link>")
-            cleanContent = "";
-
-        return cleanContent;
-    }
-
-    private static string ReplaceIdWithUser(Match match, DiscordClient clint, DiscordGuild? guild)
-    {
-        ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-        string? name;
-
-        // not that good to synchronize async like this, but its fine enough cuz its only called from an async method lol
-        if (guild is not null)
-        {
-            try
-            {
-                name = guild.GetMemberAsync(id).GetAwaiter().GetResult().DisplayName;
-            }
-            catch(Exception ex)
-            {
-                Logger.Warn($"Failed to fetch guild member from ID {id}, they probably left or were kicked/banned.", ex);
-                DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
-                name = user?.GlobalName ?? user?.Username;
-            }
-        }
-        else
-        {
-            DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
-            name = user?.GlobalName ?? user?.Username;
-        }
-
-        // to date i dont think name has been null, this should be fine
-        if (name is null)
-            return "@Person";
-        else return $"@{name}";
-    }
-
-    private static string ReplaceIdWithRole(Match match, DiscordClient clint, DiscordGuild? guild)
-    {
-        if (guild is null)
-            return "@Role";
-
-        ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-        string? name = null;
-        try
-        {
-            name = guild.GetRoleAsync(id).GetAwaiter().GetResult().Name;
-        }
-        catch
-        {
-            // ignored
-        }
-
-        // to date i don't think name has been null, this should be fine
-        return name is null ? "@Role" : $"@{name}";
-    }
-
-    private static string ReplaceIdWithChannel(Match match, DiscordClient clint, DiscordGuild? guild)
-    {
-        if (guild is null)
-            return "#channel";
-
-        ulong id = ulong.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-        string? name;
-
-        // not that good to synchronize async like this, but its fine enough cuz its only called from an async method lol
-        try
-        {
-            name = guild.GetChannelAsync(id).GetAwaiter().GetResult()?.Name ?? BoneBot.Bots[clint].allChannels[guild].First(ch => ch.Id == id).Name;
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"Failed to fetch guild channel from ID {id}. Why?", ex);
-            name = null;
-            //DiscordUser? user = clint.GetUserAsync(id, true).GetAwaiter().GetResult();
-            //name = user?.GlobalName ?? user?.Username;
-        }
-
-        // to date i don't think name has been null, this should be fine
-        return name is null ? "#channel" : $"#{name}";
     }
 
     public delegate void GlyphReplacer((Image<Rgba32> quoteBeforeText, Image<Rgba32> quoteAfterText) quoteImages, ReadOnlySpan<GlyphBounds> allGlyphs, FontRectangle textblockBounds, int lineCount);
@@ -708,7 +609,7 @@ internal static partial class Quoter
             }
         }
 
-        return $"Replying to \"{Shorten(QuickCleanContent(refMsg, clint, guild), 30).Replace("\n", "")}\" from {GetAuthorString(refMsg)}";
+        return $"Replying to \"{Shorten(TextThings.QuickCleanContent(refMsg, clint, guild), 30).Replace("\n", "")}\" from {GetAuthorString(refMsg)}";
     }
 
     private static string GetAuthorString(DiscordMessage msg)

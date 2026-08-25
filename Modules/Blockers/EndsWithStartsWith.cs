@@ -139,14 +139,14 @@ namespace BoneBoard.Modules.Blockers
                 return false;
             }
             
-            string cleanContent = RegularExpressions.CustomEmoji.Replace(msg.Content, "<>");
-            cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, "<>");
-            cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<>");
+            string cleanContent = TextThings.CustomEmoji.Replace(msg.Content, "<>");
+            cleanContent = TextThings.ChannelMention.Replace(cleanContent, "<>");
+            cleanContent = TextThings.UserMention.Replace(cleanContent, "<>");
             
             // Is likely a tenor/klipy GIF or something
             var hasMediaEmbed = msg.Attachments.Count > 0
                                 || msg.Embeds.Any(e => e.Type is "image" or "gif" or "gifv" or "video");
-            if (string.IsNullOrWhiteSpace(RegularExpressions.Link.Replace(cleanContent, ""))
+            if (string.IsNullOrWhiteSpace(TextThings.Link.Replace(cleanContent, ""))
                 && hasMediaEmbed)
                 return false;
             
@@ -163,10 +163,10 @@ namespace BoneBoard.Modules.Blockers
                 return false;
             }
             
-            string cleanContent = RegularExpressions.CustomEmoji.Replace(msg.Content, "<>");
-            cleanContent = RegularExpressions.ChannelMention.Replace(cleanContent, "<>");
-            cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<>");
-            cleanContent = RegularExpressions.Link.Replace(cleanContent, "");
+            string cleanContent = TextThings.CustomEmoji.Replace(msg.Content, "<>");
+            cleanContent = TextThings.ChannelMention.Replace(cleanContent, "<>");
+            cleanContent = TextThings.UserMention.Replace(cleanContent, "<>");
+            cleanContent = TextThings.Link.Replace(cleanContent, "");
             
             // Could be a tenor or klipy GIF, but Discord sometimes takes time to process those and embed them.
             if (string.IsNullOrWhiteSpace(cleanContent))

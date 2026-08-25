@@ -1,7 +1,6 @@
 using System.ClientModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using Azure.AI.OpenAI;
 using BoneBoard.Modules;
 using BoneBoard.Modules.Blockers;
 using DSharpPlus.Commands;
@@ -24,8 +23,11 @@ public class BoneBot
 
         if (string.IsNullOrWhiteSpace(Config.values.openAiAltEndpoint))
             return new OpenAIClient(new ApiKeyCredential(Config.values.openAiToken));
-        return new AzureOpenAIClient(new Uri(Config.values.openAiAltEndpoint),
-            new ApiKeyCredential(Config.values.openAiToken));
+        return new OpenAIClient(new ApiKeyCredential(Config.values.openAiToken),
+            new OpenAIClientOptions()
+            {
+                Endpoint = new Uri(Config.values.openAiAltEndpoint),
+            });
     }, () => Config.values.openAiToken + Config.values.openAiAltEndpoint);
 
     internal Dictionary<DiscordGuild, HashSet<DiscordChannel>> allChannels = new();

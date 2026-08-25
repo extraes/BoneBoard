@@ -41,9 +41,9 @@ internal partial class SheOnMyTill(BoneBot bot) : ModuleBase(bot)
         if (string.IsNullOrWhiteSpace(Formatter.Strip(msg.Content)))
             return false;
 
-        if (RegularExpressions.Link.Replace(msg.Content, "") == "")
+        if (TextThings.Link.Replace(msg.Content, "") == "")
             return false;
-        Regex symbols = RegularExpressions.SymbolRegex;
+        Regex symbols = TextThings.SymbolRegex;
 
         string cleanContent = symbols.Replace(msg.Content, "");
 

@@ -49,7 +49,7 @@ internal class CustomEmojisAndStickers(BoneBot bot) : ModuleBase(bot)
             reason = "this user gets no stickers in this channel. woe.";
 
 
-        if (RegularExpressions.CustomEmoji.IsMatch(msg.Content)) //todo: ignore emojis from args.Guild 
+        if (TextThings.CustomEmoji.IsMatch(msg.Content)) //todo: ignore emojis from args.Guild 
             reason = "this user cant use custom emojis in this channel. woe.";
 
         if (reason is null)

@@ -63,13 +63,13 @@ public class BeOriginal(BoneBot bot) : ModuleBase(bot)
             PersistentData.values.uniqueChannelsMessages[msg.ChannelId] = msgDict;
         }
 
-        var cleanContent = RegularExpressions.Link.Replace(msg.Content.ToLower(), "<link>");
+        var cleanContent = TextThings.Link.Replace(msg.Content.ToLower(), "<link>");
         // intentional choice to not let links slip through the cracks
         // if (cleanContent == "<link>")
         //     return false;
 
-        cleanContent = RegularExpressions.UserMention.Replace(cleanContent, "<mention>");
-        cleanContent = RegularExpressions.WhitespaceIsh.Replace(cleanContent, " ");
+        cleanContent = TextThings.UserMention.Replace(cleanContent, "<mention>");
+        cleanContent = TextThings.WhitespaceIsh.Replace(cleanContent, " ");
 
         var requiredLevDist = Config.values.originalityMinLevDist +
                               (int)(Config.values.originalityLevDistScale * cleanContent.Length);
@@ -169,7 +169,7 @@ public class BeOriginal(BoneBot bot) : ModuleBase(bot)
                 return;
 
             var footer = $"A bastion of unoriginality since {msg.Author.CreationTimestamp.Year}";
-            if (RegularExpressions.Link.Replace(msg.Content, "").Length == 0)
+            if (TextThings.Link.Replace(msg.Content, "").Length == 0)
                 footer = $"A bastion of unoriginal stoicism since {msg.Author.CreationTimestamp.Year}";
 
             var img = await Quoter.Obituary(msg, bot.client, footer);
