@@ -74,10 +74,10 @@ internal class Haiku : ModuleBase
 
         string haikuSerialize = line1 + line2 + line3;
         ulong authorId = msg.Author?.Id ?? 0;
-        // exempt owners bc it could contain a dev whos testing shit
+        // exempt owners bc it could contain a dev who's testing shit
         bool isOwner = bot.client.CurrentApplication.Owners?.Any(u => u.Id == authorId) ?? false;
         if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && isOwner &&
-            !msg.IsEdited /* editing a valid message shouldnt result in deletion */)
+            !msg.IsEdited /* editing a valid message shouldn't result in deletion */)
         {
             TryDeleteDontCare(msg,
                 "the works of others | the blood, sweat, tears poured in them | are not yours to take");
@@ -85,7 +85,7 @@ internal class Haiku : ModuleBase
             return true;
         }
 
-        // wasnt reused -- now mark it down as used
+        // wasn't reused -- now mark it down as used
         PersistentData.values.usedHaikus.Add(haikuSerialize);
         PersistentData.WritePersistentData();
 
@@ -96,40 +96,7 @@ internal class Haiku : ModuleBase
     async Task DetermineHaikuAsync(DiscordMessage msg, string content)
     {
         string[] lines = content.Split('\n');
-        var openAiClient = bot.OpenAI.Value;
-        if (openAiClient is null)
-            return;
-        var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
-        var clint = openAiClient.GetChatClient(Config.values.haikuAiModel);
-        // determine effort first because 4o is a cheaper, non-reasoning model, lol
-        ChatMessage[] messages =
-        [
-            ChatMessage.CreateSystemMessage(Config.values.haikuEffortPrompt),
-            ChatMessage.CreateUserMessage(content)
-        ];
-        var effortRes = await effortClint.CompleteChatAsync(messages);
-        if (effortRes.Value.Role != ChatMessageRole.Assistant)
-        {
-            Logger.Put($"Why is the LLM giving me a non-assistant response? Why is the {effortRes.Value.Role} yapping?? Why's it saying {effortRes.Value.Content.SelectMany(c => c.Text)}");
-        }
-
-        if (effortRes.Value.Content.Any(c => c.Text == "No"))
-        {
-            await TryDeleteAsync(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
-            reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
-            try
-            {
-                if (msg.Author is DiscordMember member)
-                    await member.TimeoutAsync(DateTime.Now.AddMinutes(30), "you disappoint me | that was a shit haiku bro | thirty minute blast.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn($"Exception while timing out the author of a shit haiku ({msg.Author})", ex);
-            }
-            // too late to mark the 
-            return;
-        }
-
+        
         int[] syllableCounts = [0, 0, 0];
         for (var i = 0; i < syllableCounts.Length; i++)
         {
@@ -145,6 +112,49 @@ internal class Haiku : ModuleBase
             TryDeleteDontCare(msg, $"message not haiku | lines do not make 5-7-5 | experience woe.");
             return;
         }
+        
+        var openAiClient = bot.OpenAI.Value;
+        if (openAiClient is null)
+        {
+            Logger.Put("Can't determine haiku without OpenAI client!");
+            return;
+        }
+        var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
+        // determine effort last because I got that shit on fast mode
+        ChatMessage[] messages =
+        [
+            ChatMessage.CreateSystemMessage(Config.values.haikuEffortPrompt),
+            ChatMessage.CreateUserMessage(content)
+        ];
+        var effortRes = await effortClint.CompleteChatAsync(messages, new ChatCompletionOptions()
+        {
+#pragma warning disable OPENAI001
+            ReasoningEffortLevel = ChatReasoningEffortLevel.Medium,
+            ServiceTier = new ChatServiceTier("fast")
+#pragma warning restore OPENAI001
+        });
+        if (effortRes.Value.Role != ChatMessageRole.Assistant)
+        {
+            Logger.Put($"Why is the LLM giving me a non-assistant response? Why is the {effortRes.Value.Role} yapping?? Why's it saying {effortRes.Value.Content.SelectMany(c => c.Text)}");
+        }
+
+        if (effortRes.Value.Content.Any(c => c.Text == "No"))
+        {
+            TryDeleteDontCare(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
+            reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
+            try
+            {
+                if (msg.Author is DiscordMember member && Config.values.timeoutLazyHaikusForMinutes > 0)
+                    await member.TimeoutAsync(DateTime.Now.AddMinutes(Config.values.timeoutLazyHaikusForMinutes), "you disappoint me | that was a shit haiku bro | thirty minute blast.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Exception while timing out the author of a lazy haiku ({msg.Author})", ex);
+            }
+            // too late to mark the 
+            return;
+        }
+
 
         // yaaaayyyy, the message is a haiku
     }
@@ -190,6 +200,31 @@ internal class Haiku : ModuleBase
     {
         str = string.Join(' ', str.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         return str.ToLowerInvariant();
+    }
+
+    [Command("checkSyllables")]
+    public static async Task MeasureHaikuSyllables(SlashCommandContext ctx, string line1, string line2, string line3)
+    {
+        string[] lines = [line1, line2, line3];
+        
+        int[] syllableCounts = [0, 0, 0];
+        for (var i = 0; i < syllableCounts.Length; i++)
+        {
+            var line = lines[i];
+            var stats = TextStatistics.TextStatistics.Parse(line);
+            syllableCounts[i] = (int)Math.Round(stats.WordCount * stats.AverageSyllablesPerWord);
+        }
+
+        bool isHaiku = syllableCounts.SequenceEqual([5, 7, 5]);
+
+        await ctx.RespondAsync($"Line 1: **{syllableCounts[0]} syllable(s)**\n" +
+                         $"-# \"{line1}\"\n" +
+                         $"Line 2: **{syllableCounts[1]} syllable(s)**\n" +
+                         $"-# \"{line2}\"\n" +
+                         $"Line 3: **{syllableCounts[2]} syllable(s)**\n" +
+                         $"-# \"{line3}\"\n" +
+                         $"\nThis **{(isHaiku ? "is" : "is not")}** a valid haiku",
+            true);
     }
 
     [Command("clearUsedHaiku")]
