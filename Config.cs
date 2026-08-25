@@ -90,6 +90,7 @@ internal class Config
     public string haikuSystemPrompt = "For each line of input, count the number of syllables and output that number on a new line. Only respond with the numbers, do not include any other text.";
     public string haikuEffortModel = "gpt-4o";
     public string haikuEffortPrompt = "You are an arbiter of effort. Your purpose is to determine whether or not a haiku was written with the express purpose of ticking a syllable requirement box, or whether it was written with an intent to actually fulfill the medium. Only respond \"Yes\" if a haiku is written with even the slightest creative intent, or \"No\" if its content is entirely low-effort and only made to count to 5-7-5.";
+    public bool useFastProcessingForEffort = false;
     public int timeoutLazyHaikusForMinutes = 10; 
     
     public string confessionCsvPath = "./confessions.csv";

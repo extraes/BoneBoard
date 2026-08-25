@@ -76,7 +76,7 @@ internal class Haiku : ModuleBase
         ulong authorId = msg.Author?.Id ?? 0;
         // exempt owners bc it could contain a dev who's testing shit
         bool isOwner = bot.client.CurrentApplication.Owners?.Any(u => u.Id == authorId) ?? false;
-        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && isOwner &&
+        if (PersistentData.values.usedHaikus.Contains(haikuSerialize) && !isOwner &&
             !msg.IsEdited /* editing a valid message shouldn't result in deletion */)
         {
             TryDeleteDontCare(msg,
@@ -89,7 +89,19 @@ internal class Haiku : ModuleBase
         PersistentData.values.usedHaikus.Add(haikuSerialize);
         PersistentData.WritePersistentData();
 
-        _ = Task.Run(() => DetermineHaikuAsync(msg, content));
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await DetermineHaikuAsync(msg, content);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Exception while determining/handling Haiku-ness of message {content}", ex);
+            }
+            
+            
+        });
         return false;
     }
     
@@ -119,26 +131,28 @@ internal class Haiku : ModuleBase
             Logger.Put("Can't determine haiku without OpenAI client!");
             return;
         }
-        var effortClint = openAiClient.GetChatClient(Config.values.haikuAiModel);
+        var effortClint = openAiClient.GetChatClient(Config.values.haikuEffortModel);
         // determine effort last because I got that shit on fast mode
         ChatMessage[] messages =
         [
             ChatMessage.CreateSystemMessage(Config.values.haikuEffortPrompt),
             ChatMessage.CreateUserMessage(content)
         ];
+        
+#pragma warning disable OPENAI001
+        ChatServiceTier? serviceTier = Config.values.useFastProcessingForEffort ? new ChatServiceTier("fast") : null;
         var effortRes = await effortClint.CompleteChatAsync(messages, new ChatCompletionOptions()
         {
-#pragma warning disable OPENAI001
-            ReasoningEffortLevel = ChatReasoningEffortLevel.Medium,
-            ServiceTier = new ChatServiceTier("fast")
-#pragma warning restore OPENAI001
+            ServiceTier = serviceTier
         });
+#pragma warning restore OPENAI001
+        
         if (effortRes.Value.Role != ChatMessageRole.Assistant)
         {
             Logger.Put($"Why is the LLM giving me a non-assistant response? Why is the {effortRes.Value.Role} yapping?? Why's it saying {effortRes.Value.Content.SelectMany(c => c.Text)}");
         }
 
-        if (effortRes.Value.Content.Any(c => c.Text == "No"))
+        if (effortRes.Value.Content.Any(c => c.Text.Contains("no", StringComparison.InvariantCultureIgnoreCase)))
         {
             TryDeleteDontCare(msg, "you disappoint me | that was a shit haiku bro | thirty minute blast.");
             reasoningTraces[msg.Id] = $"{msg.Content}\n...was deemed low effort";
