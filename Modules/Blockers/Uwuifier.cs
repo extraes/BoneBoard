@@ -134,6 +134,15 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         [DiscordPermission.ModerateMembers])]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
+        await sctx.RespondAsync("This command is temporarily disabled." +
+                                "Thank folks like:\n" +
+                                "<@1122652014913003540> (for using it on a random person in general)\n" +
+                                "<@634826035589808168> (for using it on admins)\n" +
+                                "and more, for doing shit like using it *on this bot*\n" +
+                                "My fault for not immediately putting permission requirements on it, I guess, but " +
+                                "is it so difficult to think 'hey maybe I *shouldn't* fuck with that?", true);
+        return;
+        
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
         {
             users = [];
