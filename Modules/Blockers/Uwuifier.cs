@@ -130,7 +130,8 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
 
     [Command("toggle"),
     Description("ONLY in this channel."),
-    RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ManageMessages])]
+    RequirePermissions([DiscordPermission.ManageWebhooks], 
+        [DiscordPermission.ModerateMembers])]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
