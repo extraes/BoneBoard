@@ -44,18 +44,31 @@ internal class Haiku : ModuleBase
         if (bot.IsMe(msg.Author))
             return false;
         
+        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId))
+            return false;
+        
         if (msg.Timestamp.AddDays(1) < DateTime.Now)
             return false; // message is old enough to probably not be relevant
 
         string content = msg.Content;
+
+        switch (msg.MessageType)
+        {
+            case DiscordMessageType.Default:
+            case DiscordMessageType.Reply:
+                break;
+            default:
+                // Don't care about things like ThreadCreated.
+                return false;
+        }
+        
         if (msg.Reference?.Type == DiscordMessageReferenceType.Forward && (msg.MessageSnapshots?.Count ?? 0) > 0)
             content = string.Join('\n', msg.MessageSnapshots!.Select(m => m.Message.Content));
 
         if (content.Length == 0) // empty message/only attachments
             return false;
 
-        if (!Config.values.channelsWhereMessagesMustBeHaikus.Contains(msg.ChannelId))
-            return false;
+        
 
         // do quick check for haiku
         string[] lines = content.Split('\n');
@@ -237,7 +250,10 @@ internal class Haiku : ModuleBase
                          $"-# \"{line2}\"\n" +
                          $"Line 3: **{syllableCounts[2]} syllable(s)**\n" +
                          $"-# \"{line3}\"\n" +
-                         $"\nThis **{(isHaiku ? "is" : "is not")}** a valid haiku",
+                         $"\nThis **{(isHaiku ? "is" : "is not")}** a valid haiku\n" +
+                         (isHaiku
+                             ? $"-# For your copy-pasting convenience:\n-# {line1}\n-# {line2}\n-# {line3}"
+                             : "🙁"),
             true);
     }
 
