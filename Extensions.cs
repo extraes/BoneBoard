@@ -10,6 +10,16 @@ namespace BoneBoard;
 
 public static class Extensions
 {
+    [field: ThreadStatic]
+    private static HttpClient Client
+    {
+        get
+        {
+            field ??= new HttpClient();
+            return field;
+        }
+    }
+    
     public static T Random<T>(this IEnumerable<T> enumerable)
     {
         var list = enumerable.ToList();
@@ -64,5 +74,56 @@ public static class Extensions
                 $"The module type {typeof(TModule).FullName} wasn't injected into services! Review startup code!");
         
         return (TModule)module;
+    }
+
+    public static async IAsyncEnumerable<DiscordFile> ToDiscordFiles(this IEnumerable<DiscordAttachment> attachments, DiscordGuild? server)
+    {
+        int byteLimit = server?.PremiumTier switch
+        {
+            DiscordPremiumTier.Tier_2 => 50 * 1024 * 1024,
+            DiscordPremiumTier.Tier_3 => 100 * 1024 * 1024,
+            _ => 10 * 1024 * 1024
+        };
+        int counter = 0;
+        foreach (var attachment in attachments)
+        {
+            if (attachment.FileSize > byteLimit)
+                continue;
+
+            string? url = attachment.ProxyUrl ?? attachment.Url;
+
+            if (url is null)
+                continue;
+
+            DiscordFile file;
+            try
+            {
+                var stream = await Client.GetStreamAsync(url);
+                file = new DiscordFile(attachment.FileName ?? $"Attachment {counter + 1}",
+                    stream,
+                    fileOptions: AddFileOptions.CloseStream | AddFileOptions.CopyStream);
+                counter++;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Logger.Warn($"Failed to copy attachment into DiscordFile", httpEx);
+                continue;
+            }
+
+            yield return file;
+        }
+    }
+
+    public static async Task<IEnumerable<DiscordFile>> CopyAttachments(this DiscordMessage msg)
+    {
+        // Have to do the aggregating myself because the fucking Wikipedia library requires some shit that conflicts
+        // bar-for-bar with the ACTUAL ToListAsync() method.
+        List<DiscordFile> ret = [];
+        await foreach (var file in msg.Attachments.ToDiscordFiles(msg.Channel?.Guild))
+        {
+            ret.Add(file);
+        }
+
+        return ret;
     }
 }

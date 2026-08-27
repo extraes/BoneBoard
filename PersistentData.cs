@@ -12,6 +12,7 @@ using Tomlet.Attributes;
 
 namespace BoneBoard;
 
+[SuppressMessage("ReSharper", "FieldCanBeMadeReadOnly.Global")]
 internal class PersistentData
 {
     public static event Action? PersistentDataChanged;
@@ -59,6 +60,8 @@ internal class PersistentData
     public Dictionary<ulong, Dictionary<ulong, string>> uniqueChannelsMessages = new(); // channel id -> msg id -> cleaned content
 
     public Dictionary<ulong, Dictionary<ulong, DateTime>> lastUnoriginalObituaryTimes = new(); // channel id -> user id -> last time an obituary was made for someone
+
+    public Dictionary<ulong, List<ulong>> uwuifiedUsers = []; // channel id -> user id's
     
     static PersistentData()
     {

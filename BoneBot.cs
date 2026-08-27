@@ -164,7 +164,6 @@ public class BoneBot
     private void CreateModules()
     {
         // Blockers
-        new IgnoreBots(this);
         new ModeratorIgnore(this);
         new PerChannelTimeout(this);
         new Reslow(this);
@@ -179,6 +178,8 @@ public class BoneBot
         new NicknameEnforcer(this);
         new BeOriginal(this);
         new EndsWithStartsWith(this);
+        new Uwuifier(this);
+        new IgnoreBots(this);
 
         // Non-blockers
         new Casino(this);
