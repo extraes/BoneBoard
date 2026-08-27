@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text;
 using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 
 namespace BoneBoard.Modules.Blockers;
@@ -123,7 +124,8 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
     }
 
     [Command("toggle"),
-    Description("ONLY in this channel.")]
+    Description("ONLY in this channel."),
+    RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ManageMessages])]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
@@ -136,10 +138,11 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
             users.Remove(member.Id);
         else
             users.Add(member.Id);
-        bool willNowBeUwuified = users.Contains(member.Id);
+        bool nowUwuified = users.Contains(member.Id);
+        Logger.Put($"{member} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
         
         PersistentData.WritePersistentData();
         
-        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(willNowBeUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
+        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
     }
 }
