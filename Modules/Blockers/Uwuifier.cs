@@ -130,8 +130,8 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
 
     [Command("toggle"),
     Description("ONLY in this channel."),
-    RequirePermissions([DiscordPermission.ManageWebhooks], 
-        [DiscordPermission.ModerateMembers])]
+    /*RequirePermissions([DiscordPermission.ManageWebhooks], 
+        [DiscordPermission.ModerateMembers])*/]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
         await sctx.RespondAsync("This command is temporarily disabled." +
