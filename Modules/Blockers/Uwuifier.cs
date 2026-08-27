@@ -86,6 +86,11 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         newContent.Replace('r', 'w');
         newContent.Replace('l', 'w');
 
+        
+        var randomNum = Random.Shared.NextDouble();
+        if (newContent.ToString() == originalMessage.Content)
+            randomNum /= 2;
+        
         string[] faces =
         [
             ">.<",
@@ -97,7 +102,7 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
             "૮₍  ˶•⤙•˶ ₎ა",
         ];
         const string STARS = "⁂⭐︎⋆✴︎∗";
-        switch(Random.Shared.NextDouble())
+        switch(randomNum)
         {
             case < 0.15:
                 newContent.Append($" {faces.Random()}");
