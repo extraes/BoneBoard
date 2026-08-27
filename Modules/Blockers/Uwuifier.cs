@@ -81,7 +81,7 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         
         var files = (await originalMessage.CopyAttachments()).ToArray();
 
-        var newContent = new StringBuilder(originalMessage.Content);
+        var newContent = new StringBuilder(originalMessage.Content.ToLower());
         newContent.Replace("w", "ww");
         newContent.Replace('r', 'w');
         newContent.Replace('l', 'w');
