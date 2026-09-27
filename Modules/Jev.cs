@@ -90,6 +90,9 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
                 .WithContent(reply)
                 .WithReply(message.Id, false, false).WithAllowedMentions([]);
             await message.Channel.SendMessageAsync(builder);
+            
+            if (message.Author is DiscordMember member)
+                LastJevFullResponseTime[member] = DateTime.Now;
         }
         catch (Exception ex)
         {
