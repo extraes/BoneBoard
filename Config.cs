@@ -161,6 +161,14 @@ internal class Config
 
     public ulong[] channelsWhereMsgsMustStartWithPrevMsgsLastChar = [];
 
+    public string jevKey = "";
+    public string jevEndpoint = "https://api.typesafe.ai/v1/systemone";
+    public string jevModel = "jev-latest";
+    [TomlPrecedingComment("Members with this role get a text reply from Jev; everyone else gets an emoji reaction. 0 gives everybody full replies.")]
+    public ulong jevFullResponseRole = 0;
+
+    public ulong[] jevChannels = [];
+
     static Config()
     {
         Console.WriteLine("Initializing config");
