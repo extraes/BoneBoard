@@ -191,6 +191,7 @@ public class BoneBot
         new ImageRoyale(this);
         new VideoRoyale(this);
         new StickyMessages(this);
+        new Jev(this);
     }
 #pragma warning restore CA1806
 
