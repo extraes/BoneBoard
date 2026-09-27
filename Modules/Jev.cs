@@ -72,7 +72,11 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
             return;
         }
 
-        await GenerationLock.WaitAsync();
+        if (!await GenerationLock.WaitAsync(TimeSpan.Zero))
+        {
+            await BoneBot.TryReact(message, DiscordEmoji.FromUnicode("⏳"));
+            return;
+        }
         using var typingCancellation = new CancellationTokenSource();
         var typing = KeepTyping(message.Channel, typingCancellation.Token);
         try
