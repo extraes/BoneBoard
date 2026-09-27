@@ -166,8 +166,8 @@ internal class Config
     public string jevModel = "jev-latest";
     [TomlPrecedingComment("Members with this role get a text reply from Jev; everyone else gets an emoji reaction. 0 gives everybody full replies.")]
     public ulong jevFullResponseRole = 0;
-
     public ulong[] jevChannels = [];
+    public float jevPerUserCooldownMins = 5;
 
     static Config()
     {
