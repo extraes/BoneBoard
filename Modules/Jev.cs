@@ -9,12 +9,14 @@ namespace BoneBoard.Modules;
 // The vocabulary is from that project's vocab.txt.
 internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
 {
-    private const string End = "<END>";
-    private const int MaxChoices = 255;
-    private const int QuestionsPerCall = 10;
-    private const int MaxWords = 30;
-    private const int MinWords = 2;
-    private const int MaxHistory = 5;
+    private const string END = "<END>";
+    private const int MAX_CHOICES = 255;
+    private const int QUESTIONS_PER_CALL = 10;
+    private const int MAX_WORDS = 30;
+    private const int MIN_WORDS = 2;
+    private const int MAX_HISTORY = 5;
+    private static TimeSpan JevResponseCooldown => TimeSpan.FromMinutes(Config.values.jevPerUserCooldownMins);
+    private static readonly Dictionary<DiscordMember, DateTime> LastJevFullResponseTime = [];
     private static readonly HttpClient Http = new();
     private static readonly SemaphoreSlim GenerationLock = new(1, 1);
     private static readonly HashSet<string> Stopwords = new(
@@ -30,12 +32,13 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
             .Where(w => w.Length > 0 && w is not "unanswered" and not "\\n")
             .ToArray());
     private sealed record EmojiChoice(string Name, DiscordEmoji Emoji);
-    private static readonly Lazy<EmojiChoice[]> UnicodeEmojis = new(() =>
+    private static readonly Lazy<EmojiChoice[]> DiscordStandardEmojis = new(() =>
         File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Assets", "jev-emojis.txt"))
-            .Where(line => line.Length > 0 && !line.StartsWith('#'))
+            .Where(line => line.Length > 0 && !line.StartsWith("# "))
             .Select(line => line.Split('\t', 2))
-            .Where(parts => parts.Length == 2)
-            .Select(parts => new EmojiChoice($"{parts[0]} {parts[1]}", DiscordEmoji.FromUnicode(parts[0])))
+            // DSharpPlus's emoji map can lag Discord's. Keep the recognized intersection.
+            .Where(parts => parts.Length == 2 && DiscordEmoji.IsValidUnicode(parts[0]))
+            .Select(parts => new EmojiChoice($"{parts[0]} :{parts[1]}:", DiscordEmoji.FromUnicode(parts[0])))
             .ToArray());
 
     protected override async Task MessageCreated(DiscordClient client, MessageCreatedEventArgs args)
@@ -55,7 +58,7 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         if (prompt.Length == 0)
             prompt = "hello";
 
-        var hasFullResponseRole = await HasFullResponseRole(args);
+        var hasFullResponseRole = await FullResponseCheck(args);
         if (!hasFullResponseRole)
         {
             try
@@ -93,13 +96,14 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
             Logger.Error("Jev text reply failed", ex);
             try
             {
-                await message.Channel.SendMessageAsync(new DiscordMessageBuilder()
-                    .WithContent("Jev couldn't make a reply right now.")
-                    .WithReply(message.Id, false, false).WithAllowedMentions([]));
+                var robot = DiscordEmoji.FromUnicode("🤖");
+                var x = DiscordEmoji.FromUnicode("❌");
+                await message.CreateReactionAsync(robot);
+                await message.CreateReactionAsync(x);
             }
             catch (Exception sendEx)
             {
-                Logger.Error("Jev could not send its error reply", sendEx);
+                Logger.Error("Jev could make its error reaction", sendEx);
             }
         }
         finally
@@ -110,13 +114,19 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         }
     }
 
-    private static async Task<bool> HasFullResponseRole(MessageCreatedEventArgs args)
+    private static async Task<bool> FullResponseCheck(MessageCreatedEventArgs args)
     {
         var roleId = Config.values.jevFullResponseRole;
         if (roleId == 0) return true;
         try
         {
             var member = args.Author as DiscordMember ?? await args.Guild.GetMemberAsync(args.Author.Id);
+
+            if (LastJevFullResponseTime.TryGetValue(member, out var time) && time + JevResponseCooldown > DateTime.Now)
+            {
+                return false;
+            }
+
             return member.Roles.Any(role => role.Id == roleId);
         }
         catch (Exception ex)
@@ -129,7 +139,7 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
     private static async Task<List<DiscordEmoji>> ChooseReaction(
         string prompt, List<string> history, DiscordGuild? guild, string key)
     {
-        var choices = UnicodeEmojis.Value.ToList();
+        var choices = DiscordStandardEmojis.Value.ToList();
         if (guild is not null)
             choices.AddRange(guild.Emojis.Values.Where(emoji => emoji.IsAvailable)
                 .Select(emoji => new EmojiChoice($"server emoji :{emoji.Name}:", emoji)));
@@ -142,7 +152,7 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         var state = string.Join('\n', history.Select(h => "User: " + h).Append("User: " + prompt));
         var finalists = new List<EmojiChoice>();
 
-        foreach (var group in shuffled.Chunk(MaxChoices).Chunk(QuestionsPerCall))
+        foreach (var group in shuffled.Chunk(MAX_CHOICES).Chunk(QUESTIONS_PER_CALL))
         {
             var questions = group.Select((bucket, index) =>
                 new KeyValuePair<string, object>($"emoji{index}", EmojiQuestion(bucket)))
@@ -211,7 +221,7 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
                     message.Content.StartsWith('.') || message.Content.StartsWith('/'))
                     continue;
                 history.Add(message.Content);
-                if (history.Count == MaxHistory)
+                if (history.Count == MAX_HISTORY)
                     break;
             }
         }
@@ -229,10 +239,10 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         var seen = new HashSet<string>(vocab, StringComparer.Ordinal);
         foreach (Match match in Regex.Matches(prompt.ToLowerInvariant(), "[a-z']+"))
             if (seen.Add(match.Value)) vocab.Add(match.Value);
-        vocab.Add(End);
+        vocab.Add(END);
 
         var words = new List<string>();
-        for (var step = 0; step < MaxWords; step++)
+        for (var step = 0; step < MAX_WORDS; step++)
         {
             var state = string.Join('\n', history.Select(h => "User: " + h)
                 .Append("User: " + prompt).Append("Jev: " + Render(words)));
@@ -242,15 +252,15 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
                 if (words.Count == 0) throw new HttpRequestException("Jev returned no word probabilities.");
                 break;
             }
-            var canStop = words.Count(w => w.Any(char.IsLetterOrDigit)) >= MinWords;
+            var canStop = words.Count(w => w.Any(char.IsLetterOrDigit)) >= MIN_WORDS;
             if (canStop && completeness >= 0.5) break;
 
             var ranked = probabilities
-                .Where(kv => kv.Value > 0 && (kv.Key != End || canStop) &&
+                .Where(kv => kv.Value > 0 && (kv.Key != END || canStop) &&
                     !(kv.Key.Length == 1 && NoSpaceBefore.Contains(kv.Key[0]) && words.LastOrDefault() == kv.Key))
                 .Select(kv => (kv.Key, Score: kv.Value / Penalty(words, kv.Key)))
                 .OrderByDescending(kv => kv.Score).ToArray();
-            if (ranked.Length == 0 || ranked[0].Key == End)
+            if (ranked.Length == 0 || ranked[0].Key == END)
                 break;
             words.Add(ranked[0].Key);
         }
@@ -265,11 +275,11 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
             var j = Random.Shared.Next(i + 1);
             (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
         }
-        var buckets = shuffled.Chunk(MaxChoices).ToArray();
-        var tasks = buckets.Chunk(QuestionsPerCall).Select((group, groupIndex) =>
+        var buckets = shuffled.Chunk(MAX_CHOICES).ToArray();
+        var tasks = buckets.Chunk(QUESTIONS_PER_CALL).Select((group, groupIndex) =>
         {
             var questions = group.Select((bucket, index) =>
-                new KeyValuePair<string, object>($"b{groupIndex * QuestionsPerCall + index}", ChoiceQuestion(bucket, reply)))
+                new KeyValuePair<string, object>($"b{groupIndex * QUESTIONS_PER_CALL + index}", ChoiceQuestion(bucket, reply)))
                 .ToDictionary();
             return Post(state, questions, key);
         }).ToList();
@@ -288,10 +298,10 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         foreach (var (word, probability) in Probabilities(answer)
                      .OrderByDescending(kv => kv.Value).Take(2))
             if (probability > 0) finalists.Add(word);
-        if (!finalists.Contains(End)) finalists.Add(End);
+        if (!finalists.Contains(END)) finalists.Add(END);
         var runoff = await Post(state, new Dictionary<string, object>
         {
-            ["final"] = ChoiceQuestion(finalists.Take(MaxChoices), reply)
+            ["final"] = ChoiceQuestion(finalists.Take(MAX_CHOICES), reply)
         }, key);
         return (runoff.TryGetValue("final", out var final) ? Probabilities(final) : [], complete);
     }
