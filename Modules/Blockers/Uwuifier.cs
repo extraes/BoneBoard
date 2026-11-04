@@ -144,6 +144,18 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
             await sctx.RespondAsync("You can't uwuify a bot.", true);
             return;
         }
+
+        if (sctx.Member is null)
+        {
+            await sctx.RespondAsync("Unable to check your guild membership.", true);
+            return;
+        }
+
+        if (member.Hierarchy > sctx.Member.Hierarchy)
+        {
+            await sctx.RespondAsync("You can't uwuify someone higher than you.", true);
+            return;
+        }
         
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
         {
