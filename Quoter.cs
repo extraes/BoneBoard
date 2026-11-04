@@ -1,20 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using DSharpPlus;
-using DSharpPlus.Entities;
 using SixLabors.Fonts;
-using SixLabors.Fonts.Unicode;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System.Globalization;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using SixLabors.ImageSharp.Formats.Gif;
-using StableCube.Media.Gifsicle;
 
 namespace BoneBoard;
 

@@ -74,6 +74,7 @@ public class BoneBot
 
         clientBuilder.UseCommands((isp, ce) =>
         {
+            ce.AddCheck<Plumbing.EnforceUserPermissionsCheck>();
             ce.AddProcessors(scp, mcp);
             ce.AddCommands(commandTypes);
             ce.CommandErrored += CommandErrorHandler;
