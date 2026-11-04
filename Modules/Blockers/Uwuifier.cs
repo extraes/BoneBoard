@@ -131,31 +131,14 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
     [Command("toggle"),
     Description("ONLY in this channel."),
     RequireGuild,
-    RequirePermissions([DiscordPermission.ManageWebhooks], [])]
+    RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ModerateMembers, DiscordPermission.ModerateMembers])]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
-        // Discord's default command permissions require every listed bit, so check the user OR here.
-        if (sctx.Member is null)
+        if (member.IsBot)
         {
-            await sctx.RespondAsync("You need Moderate Members or Manage Messages to use this command.", true);
+            await sctx.RespondAsync("You can't uwuify a bot.", true);
             return;
         }
-        var userPermissions = sctx.Channel.PermissionsFor(sctx.Member);
-        if (!userPermissions.HasPermission(DiscordPermission.ModerateMembers) &&
-            !userPermissions.HasPermission(DiscordPermission.ManageMessages))
-        {
-            await sctx.RespondAsync("You need Moderate Members or Manage Messages to use this command.", true);
-            return;
-        }
-
-        await sctx.RespondAsync("This command is temporarily disabled." +
-                                "Thank folks like:\n" +
-                                "<@1122652014913003540> (for using it on a random person in general)\n" +
-                                "<@634826035589808168> (for using it on admins)\n" +
-                                "and more, for doing shit like using it *on this bot*\n" +
-                                "My fault for not immediately putting permission requirements on it, I guess, but " +
-                                "is it so difficult to think 'hey maybe I *shouldn't* fuck with that?", true);
-        return;
         
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
         {
