@@ -1,19 +1,9 @@
-﻿using DSharpPlus;
-using DSharpPlus.Commands.Processors.SlashCommands;
+﻿using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Commands;
-using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
 using SixLabors.ImageSharp;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using DSharpPlus.Commands.ContextChecks;
 using System.ComponentModel;
-using System.Net.Http;
 using SixLabors.ImageSharp.Formats.Gif;
 using StableCube.Media.Gifsicle;
 

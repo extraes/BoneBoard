@@ -1,12 +1,4 @@
-﻿using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BoneBoard.Modules.Blockers;
+﻿namespace BoneBoard.Modules.Blockers;
 
 internal class MustStartWith(BoneBot bot) : ModuleBase(bot)
 {
