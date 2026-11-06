@@ -204,10 +204,15 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         else
             users.Add(member.Id);
         bool nowUwuified = users.Contains(member.Id);
+        bool channelUwuified = PersistentData.values.uwuifiedChannels.Contains(sctx.Channel.Id);
         Logger.Put($"{member} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
         
         PersistentData.WritePersistentData();
         
-        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
+        
+        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!\n" +
+                                (channelUwuified && !nowUwuified
+                                    ? $"-# FYI, This channel is currently set to uwuify non-moderators"
+                                    : ""), true);
     }
 }
