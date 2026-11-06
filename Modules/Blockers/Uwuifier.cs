@@ -13,10 +13,11 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
 {
     record MessageSignature(
         ulong ChannelId,
-        string ImitationContent,
+        string ImitatedContent,
+        string SentContent, // contains imitatedcontent, but also the reply stuff
         int AttachmentCount,
         DateTime ImitateSendTime,
-        DiscordMember Author)
+        DiscordMember OgAuthor)
     {
         public DateTime imitateFinishSendTime = ImitateSendTime;
     }
@@ -30,14 +31,7 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         // ReSharper disable once IdentifierTypo
         if (eventArgs is MessageCreatedEventArgs mcea)
         {
-            // The content filter is gonna do the heavy lifting here, lol
-            MessageSignature? originalSig = DeletedMessages.Where(dms =>
-                    mcea.Message.CreationTimestamp > dms.ImitateSendTime
-                    && mcea.Message.Content == dms.ImitationContent
-                    && mcea.Channel.Id == dms.ChannelId
-                    && mcea.Message.Attachments.Count == dms.AttachmentCount)
-                .OrderBy(dms => mcea.Message.CreationTimestamp - dms.imitateFinishSendTime)
-                .FirstOrDefault();
+            var originalSig = TryFindMsgSignature(mcea.Message);
             // Check IsBot because webhook messages are marked as bot messages :) 
             if (originalSig is not null && mcea.Author.IsBot)
             {
@@ -52,7 +46,7 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
                     
                     // MessageCreatedEventArgs reads the message's Author for its Author property,
                     // so this will autopopulate to it.
-                    SetMessageAuthor.Invoke(mcea.Message, [ originalSig.Author ]);
+                    SetMessageAuthor.Invoke(mcea.Message, [ originalSig.OgAuthor ]);
                 }
                 
                 return false;
@@ -74,6 +68,19 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         }
 
         return false;
+    }
+
+    private static MessageSignature? TryFindMsgSignature(DiscordMessage webhookMsg)
+    {
+        // The content filter is gonna do the heavy lifting here, lol
+        MessageSignature? originalSig = DeletedMessages.Where(dms =>
+                webhookMsg.CreationTimestamp > dms.ImitateSendTime
+                && webhookMsg.Content == dms.SentContent
+                && webhookMsg.ChannelId == dms.ChannelId
+                && webhookMsg.Attachments.Count == dms.AttachmentCount)
+            .OrderBy(dms => webhookMsg.CreationTimestamp - dms.imitateFinishSendTime)
+            .FirstOrDefault();
+        return originalSig;
     }
 
     private static bool IsUwuified(MessageCreatedEventArgs mcea)
@@ -136,13 +143,37 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
                 }
                 break;
         }
-        
+
+        string preReplyContent = newContent.ToString();
+        if (originalMessage.ReferencedMessage is not null)
+        {
+            int desiredLength = 50;
+            
+            var refMsg = originalMessage.ReferencedMessage;
+            var origMsg = TryFindMsgSignature(refMsg);
+            var author = origMsg?.OgAuthor ?? refMsg.Author;
+            var content = origMsg?.ImitatedContent ?? refMsg.Content;
+            var username = (author as DiscordMember)?.DisplayName
+                           ?? author?.GlobalName
+                           ?? "someone";
+            
+            var refLines = Formatter.Strip(content).Split("\n");
+
+            // only care about first line
+            var refContent = refLines[0].Length > desiredLength || refLines.Length > 1
+                ? Logger.EnsureShorterThan(refLines[0], desiredLength, "") + "..."
+                : refLines[0];
+            
+            newContent.Insert(0, $"-# *Replying to [{Formatter.Sanitize(username)}]({refMsg.JumpLink})" +
+                                 (refContent.Length > 0 ? $": {refContent}" : "")
+                                 + "*\n");
+        }
         
         var builder = new DiscordWebhookBuilder()
             .WithContent(newContent.ToString())
             .AddFiles(files);
 
-        var sig = new MessageSignature(originalMessage.ChannelId, builder.Content ?? "", files.Length, DateTime.Now, member);
+        var sig = new MessageSignature(originalMessage.ChannelId, preReplyContent, builder.Content ?? "", files.Length, DateTime.Now, member);
         DeletedMessages.PushFront(sig);
         await WebhookImitation.Skinwalk(member, originalMessage.Channel, builder);
         // Is poor form to mutate a thing already in a list? Yeah, probably.
