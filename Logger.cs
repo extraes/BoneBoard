@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using CircularBuffer;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -79,12 +80,27 @@ internal static class Logger
         LogStatements.PushBack(fileString);
     }
 
-    public static string EnsureShorterThan(string str, int maxLen, string cutoffSignifier = "...")
+    
+    public static string EnsureShorterThan(string? str, int maxLen, string cutoffSignifier = "...")
     {
-        if (str.Length < maxLen) return str;
+        str ??= "<N/A>";
+        if (str.Length <= maxLen) return str;
 
-        return str[..(maxLen - cutoffSignifier.Length)] + cutoffSignifier;
+        // If a string is too long, ensure it getting cut off doesn't cut off an emoji, because that can cause invalid
+        // sequences, and in logs, lead to a delightful little crash.
+        // This while loop performs a forward walk until the next emoji/rune/glyph/whatever would go past allowed length
+        int budget = maxLen - cutoffSignifier.Length;
+        int end = 0;
+        while (end < str.Length)
+        {
+            int next = StringInfo.GetNextTextElementLength(str, end);
+            if (end + next > budget) break;
+            end += next;
+        }
+
+        return str[..end] + cutoffSignifier;
     }
+
 
     static string GetPutTime() => DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(MaxPutDateLength);
 
