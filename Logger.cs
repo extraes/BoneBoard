@@ -84,7 +84,7 @@ internal static class Logger
     public static string EnsureShorterThan(string? str, int maxLen, string cutoffSignifier = "...")
     {
         str ??= "<N/A>";
-        if (str.Length < maxLen) return str;
+        if (str.Length <= maxLen) return str;
 
         // If a string is too long, ensure it getting cut off doesn't cut off an emoji, because that can cause invalid
         // sequences, and in logs, lead to a delightful little crash.
