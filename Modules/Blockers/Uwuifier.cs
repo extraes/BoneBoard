@@ -57,13 +57,11 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
                 
                 return false;
             }
+
             
-            if (!PersistentData.values.uwuifiedUsers.TryGetValue(mcea.Channel.Id, out var users))
+            if (!IsUwuified(mcea))
                 return false;
 
-            if (!users.Contains(mcea.Author.Id))
-                return false;
-            
             // This has the message's creation event effectively get replaced by the skinwalked message  
             Task.Run(() => Skinwalk(mcea.Message)).ContinueWith(_ =>
             {
@@ -76,6 +74,24 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         }
 
         return false;
+    }
+
+    private static bool IsUwuified(MessageCreatedEventArgs mcea)
+    {
+        DiscordPermissions moderatorPerms = default;
+        moderatorPerms.Add(DiscordPermission.ManageMessages);
+        moderatorPerms.Add(DiscordPermission.ModerateMembers);
+        if (PersistentData.values.uwuifiedChannels.Contains(mcea.Channel.Id)
+            && mcea.Author is DiscordMember member
+            && !member.PermissionsIn(mcea.Channel).HasAnyPermission(moderatorPerms))
+            return true;
+        
+        if (!PersistentData.values.uwuifiedUsers.TryGetValue(mcea.Channel.Id, out var users))
+            return false;
+
+        if (!users.Contains(mcea.Author.Id))
+            return false;
+        return true;
     }
 
     async Task Skinwalk(DiscordMessage originalMessage)
@@ -132,6 +148,26 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         // Is poor form to mutate a thing already in a list? Yeah, probably.
         sig.imitateFinishSendTime = DateTime.Now;
     }
+    
+    [Command("toggleChannel"),
+     Description("Toggles UwUification all msgs in this channel (excl. mods)"),
+     RequireGuild,
+     RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ModerateMembers, DiscordPermission.ModerateMembers])]
+    public static async Task ToggleChannel(SlashCommandContext sctx)
+    {
+        var channels = PersistentData.values.uwuifiedChannels;
+        
+        if (channels.Contains(sctx.Channel.Id))
+            channels.Remove(sctx.Channel.Id);
+        else
+            channels.Add(sctx.Channel.Id);
+        bool nowUwuified = channels.Contains(sctx.Channel.Id);
+        Logger.Put($"{sctx.Channel} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
+        
+        PersistentData.WritePersistentData();
+        
+        await sctx.RespondAsync($"Done! Now non-moderators in {sctx.Channel.Mention} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
+    }
 
     [Command("toggle"),
     Description("ONLY in this channel."),
@@ -168,10 +204,15 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         else
             users.Add(member.Id);
         bool nowUwuified = users.Contains(member.Id);
+        bool channelUwuified = PersistentData.values.uwuifiedChannels.Contains(sctx.Channel.Id);
         Logger.Put($"{member} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
         
         PersistentData.WritePersistentData();
         
-        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
+        
+        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!\n" +
+                                (channelUwuified && !nowUwuified
+                                    ? $"-# FYI, This channel is currently set to uwuify non-moderators"
+                                    : ""), true);
     }
 }

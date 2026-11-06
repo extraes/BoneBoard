@@ -55,6 +55,8 @@ internal class PersistentData
 
     public Dictionary<ulong, List<ulong>> uwuifiedUsers = []; // channel id -> user id's
     
+    public List<ulong> uwuifiedChannels = []; // channel id
+    
     static PersistentData()
     {
         Console.WriteLine("Initializing persistent data storage");
