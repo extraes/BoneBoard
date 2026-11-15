@@ -1,4 +1,6 @@
 global using BoneBoard;
+global using BoneBoard.Modules;
+global using BoneBoard.Modules.Blockers;
 global using System.IO;
 global using DSharpPlus;
 global using DSharpPlus.Entities;

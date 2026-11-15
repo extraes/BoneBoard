@@ -1,5 +1,5 @@
-﻿using System.ComponentModel;
-using DSharpPlus.Commands;
+﻿using DSharpPlus.Commands;
+using System.ComponentModel;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
@@ -34,7 +34,7 @@ internal partial class WikiTopic : ModuleBase
 
     protected override async Task InitOneShot(GuildDownloadCompletedEventArgs args)
     {
-        var isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) < DateTime.Now;
+        bool isTopicStale = PersistentData.values.lastTopicSwitchTime.AddHours(HOURS_PER_TOPIC_CHANGE) < DateTime.Now;
         if (isTopicStale || string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
             await SetNewTopic();
         else if (string.IsNullOrWhiteSpace(topicStr) && !string.IsNullOrEmpty(PersistentData.values.currentWikiTopic))
@@ -147,7 +147,8 @@ internal partial class WikiTopic : ModuleBase
         {
             if (part.Text.Contains("\"on_topic\": false"))
             {
-                Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", LogType.Normal,
+                Logger.Put($"Message {msg.Id} in channel {msg.ChannelId} was demmed to be off topic. See below for details\n{part.Text}", 
+                    LogType.Normal,
                     false);
                 whyAUsersMessageWasDeleted[msg.Author.Id] = $"Beamed for the following:```\n{content.Replace("```", "'''")}```{part.Text}";
                 await TryDeleteAsync(msg, "Off topic");

@@ -1,13 +1,6 @@
-﻿using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
-using DSharpPlus.Exceptions;
-using System;
-using System.Collections.Generic;
+﻿using DSharpPlus.Exceptions;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BoneBoard.Modules;
 

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Reflection;
 using System.Text;
+using CircularBuffer;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
@@ -12,31 +13,26 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
 {
     record MessageSignature(
         ulong ChannelId,
-        string ImitationContent,
+        string ImitatedContent,
+        string SentContent, // contains imitatedcontent, but also the reply stuff
         int AttachmentCount,
         DateTime ImitateSendTime,
-        DiscordMember Author)
+        DiscordMember OgAuthor)
     {
         public DateTime imitateFinishSendTime = ImitateSendTime;
     }
 
     private static readonly MethodInfo SetMessageAuthor =
         typeof(DiscordMessage).GetProperty(nameof(DiscordMessage.Author))!.SetMethod!;
-    private static readonly Queue<MessageSignature> deletedMessages = new(256);
+    private static readonly CircularBuffer<MessageSignature> DeletedMessages = new(256);
+    private static readonly DiscordPermissions ModeratorPerms = new(DiscordPermission.ManageMessages, DiscordPermission.ModerateMembers);
     
     protected override bool GlobalStopEventPropagation(DiscordEventArgs eventArgs)
     {
         // ReSharper disable once IdentifierTypo
         if (eventArgs is MessageCreatedEventArgs mcea)
         {
-            // The content filter is gonna do the heavy lifting here, lol
-            MessageSignature? originalSig = deletedMessages.Where(dms =>
-                    mcea.Message.CreationTimestamp > dms.ImitateSendTime
-                    && mcea.Message.Content == dms.ImitationContent
-                    && mcea.Channel.Id == dms.ChannelId
-                    && mcea.Message.Attachments.Count == dms.AttachmentCount)
-                .OrderBy(dms => mcea.Message.CreationTimestamp - dms.imitateFinishSendTime)
-                .FirstOrDefault();
+            var originalSig = TryFindMsgSignature(mcea.Message);
             // Check IsBot because webhook messages are marked as bot messages :) 
             if (originalSig is not null && mcea.Author.IsBot)
             {
@@ -51,33 +47,70 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
                     
                     // MessageCreatedEventArgs reads the message's Author for its Author property,
                     // so this will autopopulate to it.
-                    SetMessageAuthor.Invoke(mcea.Message, [ originalSig.Author ]);
+                    SetMessageAuthor.Invoke(mcea.Message, [ originalSig.OgAuthor ]);
                 }
                 
                 return false;
             }
+
             
-            if (!PersistentData.values.uwuifiedUsers.TryGetValue(mcea.Channel.Id, out var users))
+            if (!IsUwuified(mcea))
                 return false;
 
-            if (!users.Contains(mcea.Author.Id))
-                return false;
-            
             // This has the message's creation event effectively get replaced by the skinwalked message  
-            TryDeleteDontCare(mcea.Message);
+            Task.Run(() => Skinwalk(mcea.Message)).ContinueWith(skinwalkTask =>
+            {
+                // Only delete msg on successful skinwalking
+                if (skinwalkTask.Result)
+                    TryDeleteDontCare(mcea.Message);
+                return Task.CompletedTask;
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
             
-            Task.Run(() => Skinwalk(mcea.Message));
+            
             return true;
         }
 
         return false;
     }
 
-    async Task Skinwalk(DiscordMessage originalMessage)
+    private static MessageSignature? TryFindMsgSignature(DiscordMessage webhookMsg)
+    {
+        lock (DeletedMessages)
+        {
+            // The content filter is gonna do the heavy lifting here, lol
+            MessageSignature? originalSig = DeletedMessages.Where(dms =>
+                    webhookMsg.CreationTimestamp > dms.ImitateSendTime
+                    && webhookMsg.Content == dms.SentContent
+                    && webhookMsg.ChannelId == dms.ChannelId
+                    && webhookMsg.Attachments.Count == dms.AttachmentCount)
+                .OrderBy(dms => webhookMsg.CreationTimestamp - dms.imitateFinishSendTime)
+                .FirstOrDefault();
+            return originalSig;
+        }
+    }
+
+    private static bool IsUwuified(MessageCreatedEventArgs mcea)
+    {
+        if (PersistentData.values.uwuifiedChannels.Contains(mcea.Channel.Id)
+            && mcea.Author is DiscordMember member
+            && !member.PermissionsIn(mcea.Channel).HasAnyPermission(ModeratorPerms)
+            && !member.IsBot)
+            return true;
+        
+        if (!PersistentData.values.uwuifiedUsers.TryGetValue(mcea.Channel.Id, out var users))
+            return false;
+
+        if (!users.Contains(mcea.Author.Id))
+            return false;
+        return true;
+    }
+
+    // retval: success
+    async Task<bool> Skinwalk(DiscordMessage originalMessage)
     {
         if (originalMessage.Author is not DiscordMember member
             || originalMessage.Channel is null)
-            return;
+            return false;
         
         var files = (await originalMessage.CopyAttachments()).ToArray();
 
@@ -115,47 +148,90 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
                 }
                 break;
         }
-        
+
+        string preReplyContent = newContent.ToString();
+        if (originalMessage.ReferencedMessage is not null)
+        {
+            int desiredLength = 50;
+            
+            var refMsg = originalMessage.ReferencedMessage;
+            var origMsg = TryFindMsgSignature(refMsg);
+            var author = origMsg?.OgAuthor ?? refMsg.Author;
+            var content = origMsg?.ImitatedContent ?? refMsg.Content;
+            var username = (author as DiscordMember)?.DisplayName
+                           ?? author?.GlobalName
+                           ?? "someone";
+            
+            var refLines = Formatter.Strip(content).Split("\n");
+
+            // only care about first line
+            var refContent = refLines[0].Length > desiredLength || refLines.Length > 1
+                ? Logger.EnsureShorterThan(refLines[0], desiredLength, "") + "..."
+                : refLines[0];
+            
+            newContent.Insert(0, $"-# *Replying to [{Formatter.Sanitize(username)}]({refMsg.JumpLink})" +
+                                 (refContent.Length > 0 ? $": {refContent}" : "")
+                                 + "*\n");
+        }
         
         var builder = new DiscordWebhookBuilder()
-            .WithContent(newContent.ToString())
+            .WithContent(Logger.EnsureShorterThan(newContent.ToString(), 2000, "\n-# *[oops! cutoff!]*"))
             .AddFiles(files);
 
-        var sig = new MessageSignature(originalMessage.ChannelId, builder.Content ?? "", files.Length, DateTime.Now, member);
-        deletedMessages.Enqueue(sig);
+        var sig = new MessageSignature(originalMessage.ChannelId, preReplyContent, builder.Content ?? "", files.Length, DateTime.Now, member);
+        lock (DeletedMessages)
+        {
+            DeletedMessages.PushFront(sig);
+        }
         await WebhookImitation.Skinwalk(member, originalMessage.Channel, builder);
         // Is poor form to mutate a thing already in a list? Yeah, probably.
         sig.imitateFinishSendTime = DateTime.Now;
+        return true;
+    }
+    
+    [Command("toggleChannel"),
+     Description("Toggles UwUification all msgs in this channel (excl. mods)"),
+     RequireGuild,
+     RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ManageMessages, DiscordPermission.ModerateMembers])]
+    public static async Task ToggleChannel(SlashCommandContext sctx)
+    {
+        var channels = PersistentData.values.uwuifiedChannels;
+        
+        if (channels.Contains(sctx.Channel.Id))
+            channels.Remove(sctx.Channel.Id);
+        else
+            channels.Add(sctx.Channel.Id);
+        bool nowUwuified = channels.Contains(sctx.Channel.Id);
+        Logger.Put($"{sctx.Channel} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
+        
+        PersistentData.WritePersistentData();
+        
+        await sctx.RespondAsync($"Done! Now non-moderators in {sctx.Channel.Mention} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
     }
 
     [Command("toggle"),
     Description("ONLY in this channel."),
     RequireGuild,
-    RequirePermissions([DiscordPermission.ManageWebhooks], [])]
+    RequirePermissions([DiscordPermission.ManageWebhooks], [DiscordPermission.ManageMessages, DiscordPermission.ModerateMembers])]
     public static async Task Toggle(SlashCommandContext sctx, DiscordMember member)
     {
-        // Discord's default command permissions require every listed bit, so check the user OR here.
-        if (sctx.Member is null)
+        if (member.IsBot)
         {
-            await sctx.RespondAsync("You need Moderate Members or Manage Messages to use this command.", true);
-            return;
-        }
-        var userPermissions = sctx.Channel.PermissionsFor(sctx.Member);
-        if (!userPermissions.HasPermission(DiscordPermission.ModerateMembers) &&
-            !userPermissions.HasPermission(DiscordPermission.ManageMessages))
-        {
-            await sctx.RespondAsync("You need Moderate Members or Manage Messages to use this command.", true);
+            await sctx.RespondAsync("You can't uwuify a bot.", true);
             return;
         }
 
-        await sctx.RespondAsync("This command is temporarily disabled." +
-                                "Thank folks like:\n" +
-                                "<@1122652014913003540> (for using it on a random person in general)\n" +
-                                "<@634826035589808168> (for using it on admins)\n" +
-                                "and more, for doing shit like using it *on this bot*\n" +
-                                "My fault for not immediately putting permission requirements on it, I guess, but " +
-                                "is it so difficult to think 'hey maybe I *shouldn't* fuck with that?", true);
-        return;
+        if (sctx.Member is null)
+        {
+            await sctx.RespondAsync("Unable to check your guild membership.", true);
+            return;
+        }
+
+        if (member.Hierarchy > sctx.Member.Hierarchy)
+        {
+            await sctx.RespondAsync("You can't uwuify someone higher than you.", true);
+            return;
+        }
         
         if (!PersistentData.values.uwuifiedUsers.TryGetValue(sctx.Channel.Id, out var users))
         {
@@ -168,10 +244,16 @@ public class Uwuifier(BoneBot bot) : ModuleBase(bot)
         else
             users.Add(member.Id);
         bool nowUwuified = users.Contains(member.Id);
+        bool channelUwuified = PersistentData.values.uwuifiedChannels.Contains(sctx.Channel.Id);
         Logger.Put($"{member} {(nowUwuified ? "will" : "wont")} be uwuified at the request of {sctx.User}");
         
         PersistentData.WritePersistentData();
         
-        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!", true);
+        bool isModerator = member.PermissionsIn(sctx.Channel).HasAnyPermission(ModeratorPerms);
+        
+        await sctx.RespondAsync($"Done! Now {member.DisplayName} {(nowUwuified ? "will" : "won't")} have their messages uwu-ified!\n" +
+                                (channelUwuified && !nowUwuified && !isModerator
+                                    ? $"-# FYI, This channel is currently set to uwuify non-moderators"
+                                    : ""), true);
     }
 }

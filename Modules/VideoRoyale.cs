@@ -1,18 +1,8 @@
 ﻿using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Commands;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.ComponentModel;
-using System.Net.Http;
-using DSharpPlus.Entities;
-using DSharpPlus;
-using DSharpPlus.EventArgs;
 using DSharpPlus.Commands.ContextChecks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace BoneBoard.Modules;
 

@@ -1,22 +1,28 @@
-﻿using DSharpPlus;
-using DSharpPlus.Commands;
+﻿using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
-using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
 using DSharpPlus.Exceptions;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
 
 namespace BoneBoard.Modules;
+
+
+public enum FrogRoleActivation
+{
+    NONE,
+    REACTION,
+    REPLY,
+}
+
+public enum FrogRoleLimitation
+{
+    NONE = 0,
+    DAY_OF_WEEK = 1 << 0,
+}
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("frog")]

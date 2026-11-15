@@ -2,18 +2,9 @@
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
-using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
-using OpenAI;
 using OpenAI.Chat;
-using OpenAI.Responses;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace BoneBoard.Modules.Blockers;
 

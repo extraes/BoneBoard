@@ -1,22 +1,23 @@
 ﻿using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Commands;
-using DSharpPlus.EventArgs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using DSharpPlus.Entities;
-using OpenAI;
 using Csv;
 using OpenAI.Chat;
 using System.ComponentModel;
 using System.Globalization;
 using DSharpPlus.Commands.ContextChecks;
-using DSharpPlus;
 
 namespace BoneBoard.Modules;
+
+[Flags]
+public enum ConfessionalRequirements
+{
+    NONE,
+    ROLE = 1 << 0,
+    COOLDOWN = 1 << 1,
+    ROLE_AND_COOLDOWN = ROLE | COOLDOWN,
+}
 
 [AllowedProcessors(typeof(SlashCommandProcessor))]
 [Command("confess")]

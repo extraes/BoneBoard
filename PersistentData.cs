@@ -1,14 +1,6 @@
-﻿using DSharpPlus.Entities;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
+﻿using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Tomlet;
-using Tomlet.Attributes;
 
 namespace BoneBoard;
 
@@ -62,6 +54,8 @@ internal class PersistentData
     public Dictionary<ulong, Dictionary<ulong, DateTime>> lastUnoriginalObituaryTimes = new(); // channel id -> user id -> last time an obituary was made for someone
 
     public Dictionary<ulong, List<ulong>> uwuifiedUsers = []; // channel id -> user id's
+    
+    public List<ulong> uwuifiedChannels = []; // channel id
     
     static PersistentData()
     {

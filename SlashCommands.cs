@@ -2,11 +2,9 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
-using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
 using DSharpPlus.Commands.Processors.SlashCommands;
-using DSharpPlus.Entities;
 
 namespace BoneBoard;
 

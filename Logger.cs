@@ -1,7 +1,8 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
+using CircularBuffer;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using CircularBuffer;
 
 namespace BoneBoard;
 
@@ -38,40 +39,19 @@ internal static class Logger
             Put($"Deleting old log {file.Name}", LogType.Debug);
             file.Delete();
         }
-
         if (files.Length > maxFiles) Put($"Deleted {files.Length - maxFiles} old log file{(files.Length - maxFiles == 1 ? "" : "s")}.");
     }
 
 
-    public static void Error(string str)
-    {
-        PutInternal(str, LogType.Fatal, false);
-    }
+    public static void Error(string str) => PutInternal(str, LogType.Fatal, false);
+    public static void Error(string str, Exception ex) => PutInternal(str + "\n\t" + ex.ToString(), LogType.Fatal, false);
 
-    public static void Error(string str, Exception ex)
-    {
-        PutInternal(str + "\n\t" + ex.ToString(), LogType.Fatal, false);
-    }
+    public static void Warn(string str) => PutInternal(str, LogType.Warn, false);
+    public static void Warn(string str, Exception ex) => PutInternal(str + "\n\t" + ex.ToString(), LogType.Warn, false);
 
-    public static void Warn(string str)
-    {
-        PutInternal(str, LogType.Warn, false);
-    }
+    public static void Put(string str) => PutInternal(str, LogType.Normal);
 
-    public static void Warn(string str, Exception ex)
-    {
-        PutInternal(str + "\n\t" + ex.ToString(), LogType.Warn, false);
-    }
-
-    public static void Put(string str)
-    {
-        PutInternal(str, LogType.Normal);
-    }
-
-    public static void Put(string str, LogType reason, bool cleanMultiline = true)
-    {
-        PutInternal(str, reason, cleanMultiline);
-    }
+    public static void Put(string str, LogType reason, bool cleanMultiline = true) => PutInternal(str, reason, cleanMultiline);
 
     // private method so that GetCaller always has a consistent count of frames to ignore
     private static void PutInternal(string str, LogType reason, bool cleanMultiline = true)
@@ -97,21 +77,32 @@ internal static class Logger
             LogFile.WriteLine(fileString);
             LogFile.Flush();
         }
-
         LogStatements.PushBack(fileString);
     }
 
-    public static string EnsureShorterThan(string str, int maxLen, string cutoffSignifier = "...")
+    
+    public static string EnsureShorterThan(string? str, int maxLen, string cutoffSignifier = "...")
     {
-        if (str.Length < maxLen) return str;
+        str ??= "<N/A>";
+        if (str.Length <= maxLen) return str;
 
-        return str[..(maxLen - cutoffSignifier.Length)] + cutoffSignifier;
+        // If a string is too long, ensure it getting cut off doesn't cut off an emoji, because that can cause invalid
+        // sequences, and in logs, lead to a delightful little crash.
+        // This while loop performs a forward walk until the next emoji/rune/glyph/whatever would go past allowed length
+        int budget = maxLen - cutoffSignifier.Length;
+        int end = 0;
+        while (end < str.Length)
+        {
+            int next = StringInfo.GetNextTextElementLength(str, end);
+            if (end + next > budget) break;
+            end += next;
+        }
+
+        return str[..end] + cutoffSignifier;
     }
 
-    private static string GetPutTime()
-    {
-        return DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(MaxPutDateLength);
-    }
+
+    static string GetPutTime() => DateTime.Now.ToString(PUT_DATE_FORMAT).PadLeft(MaxPutDateLength);
 
     private static string GetCaller()
     {
@@ -127,7 +118,7 @@ internal static class Logger
             {
                 return string.Concat(decType.DeclaringType!.Name, ".", decType.Name.Split('>').First().AsSpan(1));
             }
-
+            
 
             if (decType != typeof(Logger) && IsTypeLoggable(decType))
             {
