@@ -123,6 +123,68 @@ public partial class ModuleBase
     }
 
     [SuppressMessage("ReSharper", "EmptyGeneralCatchClause")]
+    protected DiscordGuild? GetGuild(DiscordEventArgs args)
+    {
+        dynamic dynargs = args;
+
+        try
+        {
+            return dynargs.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.GuildAfter;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.Interaction.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.Rule.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.Thread.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.Event.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.EventAfter.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.PollVoteUpdate.Guild;
+        }
+        catch { }
+
+        try
+        {
+            return dynargs.PresenceAfter.Guild;
+        }
+        catch { }
+
+        return null;
+    }
+
+    [SuppressMessage("ReSharper", "EmptyGeneralCatchClause")]
     protected DiscordUser? GetUser(DiscordEventArgs args)
     {
         dynamic dynargs = args;
