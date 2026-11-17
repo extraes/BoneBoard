@@ -184,35 +184,69 @@ public partial class ModuleBase
         return null;
     }
 
-    [SuppressMessage("ReSharper", "EmptyGeneralCatchClause")]
-    protected DiscordUser? GetUser(DiscordEventArgs args)
+    protected enum EventUserKind
     {
-        dynamic dynargs = args;
-        try
+        Associated,
+        Actor,
+        Subject
+    }
+
+    // Associated preserves the original meaning. Actor/Subject opt into an explicit role.
+    // A missing actor (for example, the moderator behind a ban) is never inferred.
+    protected DiscordUser? GetUser(DiscordEventArgs args, EventUserKind kind = EventUserKind.Associated)
+    {
+        if (args is ContextMenuInteractionCreatedEventArgs context)
+            return kind == EventUserKind.Subject
+                ? context.TargetUser
+                : context.User;
+
+        if (args is GuildAuditLogCreatedEventArgs audit && kind != EventUserKind.Subject)
+            return audit.AuditLogEntry.UserResponsible;
+
+        if (kind == EventUserKind.Actor &&
+            args is GuildBanAddedEventArgs
+            or GuildBanRemovedEventArgs
+            or GuildMemberAddedEventArgs
+            or GuildMemberRemovedEventArgs
+            or GuildMemberUpdatedEventArgs
+            or ThreadMemberUpdatedEventArgs
+            or VoiceStateUpdatedEventArgs
+            or MessageDeletedEventArgs
+            or MessageReactionRemovedEventArgs
+            or MessageReactionRemovedEmojiEventArgs
+            or MessageReactionsClearedEventArgs)
+            return null;
+
+        if (args is VoiceStateUpdatedEventArgs voice)
         {
-            return dynargs.User;
+            // ReSharper disable once ConvertTypeCheckPatternToNullCheck
+            if (voice.GuildId is ulong guildId &&
+                bot.client.Guilds.TryGetValue(guildId, out var guild) &&
+                guild.Members.TryGetValue(voice.UserId, out var member))
+                return member;
+            return null;
         }
-        catch { }
 
-        try
+        dynamic dynArgs = args;
+
+        return Read(() => dynArgs.User)
+               ?? Read(() => dynArgs.Member)
+               ?? Read(() => dynArgs.Author)
+               ?? Read(() => dynArgs.UserAfter)
+               ?? Read(() => dynArgs.MemberAfter)
+               ?? Read(() => dynArgs.Interaction.User)
+               ?? Read(() => dynArgs.PollVoteUpdate.User)
+               ?? Read(() => dynArgs.Creator)
+               ?? Read(() => dynArgs.ThreadMember.Member)
+               ?? Read(() => dynArgs.Message.Author);
+
+        DiscordUser? Read(Func<DiscordUser?> read)
         {
-            return dynargs.Member;
+            try
+            {
+                return read();
+            }
+            catch { return null; }
         }
-        catch { }
-
-
-        try
-        {
-            return dynargs.Author;
-        }
-        catch { }
-
-        try
-        {
-            return dynargs.UserAfter;
-        }
-        catch { }
-
-        return null;
     }
 }
