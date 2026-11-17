@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using BoneBoard.Modules;
 using BoneBoard.Modules.Blockers;
+using BoneBoard.Plumbing;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.EventArgs;
 using DSharpPlus.Commands.Exceptions;
@@ -74,7 +75,8 @@ public class BoneBot
 
         clientBuilder.UseCommands((isp, ce) =>
         {
-            ce.AddCheck<Plumbing.EnforceUserPermissionsCheck>();
+            ce.AddCheck<EnforceHomeServer>();
+            ce.AddCheck<EnforceUserPermissionsCheck>();
             ce.AddProcessors(scp, mcp);
             ce.AddCommands(commandTypes);
             ce.CommandErrored += CommandErrorHandler;
@@ -165,6 +167,7 @@ public class BoneBot
     private void CreateModules()
     {
         // Blockers
+        new HomeRestriction(this);
         new ModeratorIgnore(this);
         new PerChannelTimeout(this);
         new Reslow(this);

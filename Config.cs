@@ -13,6 +13,8 @@ internal class Config
     private const string CFG_PATH = "./config.toml";
     internal string token = "";
     public string logPath = "./logs/";
+    [TomlInlineComment("If this is set, it'll ignore things outside of the home server")]
+    public ulong homeServerId = 0;
 
     public string quoteFont = "Comfortaa";
     

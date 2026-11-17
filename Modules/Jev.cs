@@ -50,8 +50,7 @@ internal sealed class Jev(BoneBot bot) : ModuleBase(bot)
         if (message.Channel is null)
             return;
         var isMention = args.MentionedUsers.Any(user => user.Id == client.CurrentUser.Id);
-        var isReply = message.ReferencedMessage?.Author?.Id == client.CurrentUser.Id;
-        if (!isMention && !isReply)
+        if (!isMention)
             return;
 
         var prompt = Regex.Replace(message.Content ?? "", $@"<@!?{client.CurrentUser.Id}>", "").Trim();
