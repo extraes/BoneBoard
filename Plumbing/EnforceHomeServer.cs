@@ -16,7 +16,7 @@ public class EnforceHomeServer : IContextCheck<UnconditionalCheckAttribute>
             return null;
 
         if (context.Guild is not null
-            && context.Guild.Id != Config.values.homeServerId)
+            && context.Guild.Id == Config.values.homeServerId)
             return null;
         
         var currUser = context.Client.CurrentUser;
